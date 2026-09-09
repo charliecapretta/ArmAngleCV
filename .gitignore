@@ -1,0 +1,49 @@
+# Virtualenv -- 2.6 GB, rebuild with: python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+.venv/
+
+# Broadcast clips -- 947 MB, 185 clips. Re-downloadable from Savant:
+#   fetchPitchBatch.py / fetchLowSlotBatch.py
+# labels.csv keys on game_pk + play_id, so the labels survive without the video.
+pitches/
+releaseFrames/
+
+# Model weights and derived arrays. All rebuildable; none belong in git.
+#   models/od/.../glove_tracking.pt is 109 MB -- GitHub HARD-REJECTS files over 100 MB.
+#   phase4/crops.npz is 51 MB -- past GitHub's 50 MB warning.
+# Rebuild: phase4/detect.py then phase4/buildDataset.py -> crops.npz + index.csv
+#          phase4/trainFinal.py -> keypoints.pt
+models/
+*.pt
+*.npz
+
+# Ridge models are 2-3 KB and ARE tracked deliberately -- they are what
+# predictLabels.py and the labeler load. Do not add *.joblib here.
+
+# Diagnostic images and overlay dumps. Cheap to regenerate, expensive in git.
+logs/overlays/
+logs/overlays2/
+logs/*.png
+reports/local_reel_review/
+
+# Python
+__pycache__/
+*.py[cod]
+
+# macOS
+.DS_Store
+
+# Savant /gf API response cache -- regenerated on demand by savantUtils.py.
+cache/
+
+# Per-user working data. Each person who clones this gets their OWN footage,
+# their own annotations, and their own predictions -- none of it is shared state.
+# labelServer.py creates all of these on demand (readLabelFile / readLocalVideos
+# both return [] when the file is absent), so a fresh clone starts clean.
+#
+# labels.csv is NOT ignored: it is the 192 MLB pitches the shipped model was
+# trained on, and the provenance of every number in HANDOFF.md.
+localVideos.json
+localLabels.csv
+analysisLabels.csv
+*.before-streamlined
+labels.backup-*.csv

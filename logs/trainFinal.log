@@ -1,0 +1,15 @@
+skipping the Ridge refit -- armAngleModel.joblib will be used instead
+
+keypoint model on all 180 pitches...
+    epoch   1/100  loss 0.19296
+    epoch  11/100  loss 0.01873
+    epoch  21/100  loss 0.01259
+    epoch  31/100  loss 0.01181
+    epoch  41/100  loss 0.00803
+    epoch  51/100  loss 0.00761
+    epoch  61/100  loss 0.00683
+    epoch  71/100  loss 0.00599
+    epoch  81/100  loss 0.00556
+    epoch  91/100  loss 0.00518
+    epoch 100/100  loss 0.00625
+  keypoints -> /Users/charliecapretta/Desktop/ArmAngleAttempt/phase4/keypoints.pt (13 MB)

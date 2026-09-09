@@ -1,0 +1,48 @@
+{
+  "n": 180,
+  "pitchers": 98,
+  "parks": 30,
+  "folds": 8,
+  "labels_sha256": "b7bcda8d536af227c58f109d57fdfe4a494e3e450e4a3329d0773da85393a02e",
+  "uniform_resize_factors": [
+    0.5,
+    1.5,
+    2
+  ],
+  "results": {
+    "raw": {
+      "pitcher_rmse": 2.6511366697266974,
+      "pitcher_mae": 2.135026095706359,
+      "park_rmse": 2.5187079387510782,
+      "park_mae": 2.0415920128951943,
+      "resize_max_delta": 18.86121471445123,
+      "resize_mean_delta": 3.3040768703206362
+    },
+    "height720": {
+      "pitcher_rmse": 2.6528482652762433,
+      "pitcher_mae": 2.136647750200617,
+      "park_rmse": 2.5214242056735197,
+      "park_mae": 2.0429637850452598,
+      "resize_max_delta": 3.197442310920451e-14,
+      "resize_mean_delta": 3.2484303313106432e-15
+    },
+    "angles_only": {
+      "pitcher_rmse": 3.234165781646478,
+      "pitcher_mae": 2.5511468402229047,
+      "park_rmse": 3.0378961637869533,
+      "park_mae": 2.4388186890395653,
+      "resize_max_delta": 0.0,
+      "resize_mean_delta": 0.0
+    },
+    "body_relative": {
+      "pitcher_rmse": 3.9074948350866183,
+      "pitcher_mae": 2.7536671672358244,
+      "park_rmse": 2.71388437209265,
+      "park_mae": 2.0898704292802703,
+      "resize_max_delta": 2.842170943040401e-14,
+      "resize_mean_delta": 2.2878818181534708e-15
+    }
+  },
+  "selection": "height720 removes uniform-resolution sensitivity with essentially unchanged MLB held-out accuracy. Body-relative and angles-only inputs scored worse by pitcher.",
+  "limits": "Development comparison on existing MLB labels. Park folds can share pitchers. Uniform scaling is not a change of camera view, crop, zoom, or temporal sampling. No college ground truth or college fitting."
+}

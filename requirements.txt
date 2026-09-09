@@ -1,0 +1,16 @@
+# Runtime for the label-and-measure path: open your own video, click the five
+# points, get an arm angle from the MLB-trained Ridge. Versions are the ones the
+# reported numbers were produced with; scikit-learn in particular moves the
+# figures slightly between releases.
+numpy==1.26.4
+pandas==2.3.3
+scikit-learn==1.9.0
+joblib==1.5.3
+opencv-python==4.11.0.86
+
+# Only needed to fetch MLB clips (fetchPitchBatch.py, fetchLowSlotBatch.py):
+#   requests==2.34.2
+# Only needed for the Phase 4 keypoint model, which is on hold:
+#   torch==2.2.2
+#   torchvision==0.17.2
+#   ultralytics==8.4.124

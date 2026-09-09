@@ -1,0 +1,103 @@
+start Tue Sep  8 18:27:22 EDT 2026
+180 pitches, 98 pitchers, 30 parks
+model 'resnet', GroupKFold on pitcher_id, 5 folds
+
+  excluding 1 unlearnable crop(s) from training (kept in test)
+    epoch   1/100  loss 0.20028
+    epoch  11/100  loss 0.01507
+    epoch  21/100  loss 0.00958
+    epoch  31/100  loss 0.00705
+    epoch  41/100  loss 0.00550
+    epoch  51/100  loss 0.00442
+    epoch  61/100  loss 0.00411
+    epoch  71/100  loss 0.00342
+    epoch  81/100  loss 0.00318
+    epoch  91/100  loss 0.00282
+    epoch 100/100  loss 0.00291
+  fold 1/5: trained on 143, predicted 36  (1073s)
+    epoch   1/100  loss 0.19381
+    epoch  11/100  loss 0.01620
+    epoch  21/100  loss 0.00933
+    epoch  31/100  loss 0.00632
+    epoch  41/100  loss 0.00504
+    epoch  51/100  loss 0.00505
+    epoch  61/100  loss 0.00388
+    epoch  71/100  loss 0.00342
+    epoch  81/100  loss 0.00299
+    epoch  91/100  loss 0.00295
+    epoch 100/100  loss 0.00289
+  fold 2/5: trained on 143, predicted 36  (1039s)
+    epoch   1/100  loss 0.19250
+    epoch  11/100  loss 0.01625
+    epoch  21/100  loss 0.00796
+    epoch  31/100  loss 0.00618
+    epoch  41/100  loss 0.00534
+    epoch  51/100  loss 0.00471
+    epoch  61/100  loss 0.00372
+    epoch  71/100  loss 0.00333
+    epoch  81/100  loss 0.00297
+    epoch  91/100  loss 0.00303
+    epoch 100/100  loss 0.00288
+  fold 3/5: trained on 143, predicted 36  (1057s)
+    epoch   1/100  loss 0.18736
+    epoch  11/100  loss 0.01798
+    epoch  21/100  loss 0.00986
+    epoch  31/100  loss 0.00812
+    epoch  41/100  loss 0.00528
+    epoch  51/100  loss 0.00518
+    epoch  61/100  loss 0.00409
+    epoch  71/100  loss 0.00321
+    epoch  81/100  loss 0.00315
+    epoch  91/100  loss 0.00322
+    epoch 100/100  loss 0.00273
+  fold 4/5: trained on 144, predicted 36  (1400s)
+    epoch   1/100  loss 0.19413
+    epoch  11/100  loss 0.01614
+    epoch  21/100  loss 0.00902
+    epoch  31/100  loss 0.00673
+    epoch  41/100  loss 0.00585
+    epoch  51/100  loss 0.00473
+    epoch  61/100  loss 0.00438
+    epoch  71/100  loss 0.00371
+    epoch  81/100  loss 0.00316
+    epoch  91/100  loss 0.00320
+    epoch 100/100  loss 0.00290
+  fold 5/5: trained on 143, predicted 36  (1473s)
+
+=== KEYPOINT ERROR (held out by pitcher, full-frame pixels) ===
+  keypoint           median      p90    ~deg      COCO
+  shoulder              8.9     24.0    4.83      10.7
+  off_shoulder          7.9     19.4    4.25       4.8
+  elbow                12.2     40.7    6.57       7.0
+  wrist                 8.5     52.1    4.61      15.2
+  ball                  6.7     45.7    3.64        --
+  median px, p90 px, median converted to degrees, and COCO's median for comparison
+  (nothing off the shelf finds the ball at all)
+
+=== END TO END: PREDICTED KEYPOINTS -> RIDGE -> arm_angle ===
+  predict the mean (trivial baseline)    RMSE 31.027   MAE 23.964
+  hand-clicked ball_angle, no model      RMSE  3.227   MAE  2.592
+  predicted ball_angle, no model         RMSE 11.268   MAE  5.276
+  predicted keypoints -> Ridge (refit)   RMSE 13.579   MAE  6.864
+  predicted keypoints -> Ridge (hand-fit) RMSE 11.104   MAE  4.841
+  hand-clicked keypoints -> Ridge (ceiling) RMSE  2.651   MAE  2.135
+
+  verdict: 13.58 deg -> under-powered at n=180; the fix is more labels, not more architecture
+
+=== ABLATION: WHICH KEYPOINT COSTS YOU? ===
+  (predicted keypoints, except the named ones taken from the hand labels)
+  hand ball only                         RMSE  4.302   MAE  3.300
+  hand shoulder only                     RMSE  7.728   MAE  4.318
+  hand body, predicted ball              RMSE  3.080   MAE  2.353
+  hand everything                        RMSE  2.651   MAE  2.135
+
+=== BY TRUE ANGLE ===
+   -70 to -30:  n=12   bias -27.46  MAE 27.46  << thin
+   -30 to -10:  n=19   bias  -1.32  MAE  3.49
+   -10 to  10:  n=63   bias  -0.51  MAE  3.72
+    10 to  30:  n=35   bias  -1.26  MAE  4.06
+    30 to  50:  n=31   bias  +0.98  MAE  5.80
+    50 to  80:  n=20   bias  +8.71  MAE 14.19
+
+wrote /Users/charliecapretta/Desktop/ArmAngleAttempt/phase4/predictions-resnet.csv
+exit=0 Tue Sep  8 20:08:12 EDT 2026

@@ -1,0 +1,380 @@
+# Arm Angle from Broadcast Video — handoff
+
+Project dir: `~/Desktop/ArmAngleAttempt`. Run everything via `./.venv/bin/python`.
+
+## Goal
+
+Measure a pitcher's release arm angle from MLB broadcast video, validated against
+Statcast's `arm_angle`. Human-in-the-loop labeling → a model that predicts true
+arm angle from clicked keypoints.
+
+## Where it stands
+
+**180 labeled pitches · 98 pitchers · 30 parks · 196 MLB clips downloaded.**
+
+Held out by pitcher (`GroupKFold` on `pitcher_id`):
+
+```
+predict the mean (trivial baseline)    RMSE 31.027   MAE 23.964
+no model (ball_angle raw)              RMSE  3.227   MAE  2.592
+Ridge on 12 features                   RMSE  2.651   MAE  2.135
+```
+
+The existing MLB labels are complete. College/high-school generalization remains
+unvalidated. Labeling now has separate release-selection and point-review steps:
+confirmed releases can be queued for later annotation, body points are manual by default,
+and local reels support multiple pitch records. Release selection is still manual.
+See README section 2 for usage, status meanings, and recovery behavior.
+
+## Workspace split — September 8, 2026
+
+`index.html` routes to training (`labelTool.html`) or analysis (`analyze.html`).
+The server serves the same shared UI with a workspace flag. Both use Release →
+Points → Review; no automatic point suggestions. Review displays the measured
+shoulder-to-ball image angle beside the model estimate or Statcast reference.
+Analysis calls the normalized
+manual prediction model at review. Training reveals Statcast only at review.
+API reads/writes carry `workspace=training|analysis`; analysis writes only
+`analysisLabels.csv`, inheriting existing local annotations read-only. Original
+MLB/local labels and model files are retained. Tests cover workspace separation,
+undo, manual release checkpoints, review readiness, and stale predictions.
+
+`fetchUiTestBatch.py` downloaded 12 additional clips, listed in `uiTestBatch.json`
+and marked `uiTestBatch` in clip metadata. Angles span −59.9° to +75.1°, with
+12 pitchers and approximately 59.5–59.7 fps source footage. These clips are the
+default training queue and practice examples in analysis. No model retraining.
+UI browser checks must use temporary copies of all four label/registration paths.
+The user may be actively labeling in Chrome; never overwrite or reset their rows.
+
+## Manual prediction update — September 8, 2026
+
+User has deferred auto-labeling. Focus is image-size invariance and approximate
+release labeling; MLB supplies the verified angle targets. College clicks are not
+true angle labels. `angleInputs.py` versions input conventions; `predictLabels.py`
+and the labeler use `armAngleModelResolutionSafe.joblib` (height720). Original
+`armAngleModel.joblib` and automatic-inference paths remain intact.
+
+Eight-fold pitcher-grouped RMSE: legacy 2.651°, height720 2.653°, angles-only 3.234°,
+body-relative 3.907°. Common height removes uniform-resize drift (legacy maximum
+18.861° across tested held-out resizes). It does not fix different framing or camera
+projection. College seven-frame mean from manual points is now 9.6°, unverified.
+See `reports/resolution_validation/report.md` for methods and data.
+
+The labeler offers optional release/point quality flags and a read-only prediction
+button. New saves append these two fields after the earlier 30; older data defaults
+to unreviewed. Tests use temporary labels. Do not demand a clean, exact release from
+30 fps footage. The two unlabeled deliveries at the end of the reel are excluded at
+the user's request.
+
+### Decision — auto-labeling is on hold (2026-09-08)
+
+**Manual labeling is the path forward.** The Phase 4 keypoint model is paused, not
+abandoned: nothing is deleted, `phase4/` stays runnable, and `predictAngle.py` /
+`analyzeVideo.py` remain intact. New labels come from hand-clicking.
+
+**The automatic release-frame model is still live** and is the one automation thread
+still being pursued (next steps item 1). It is a separate problem from keypoints:
+picking *which frame* is release, not *where the joints are* in it.
+
+**If auto-labeling resumes, it is gated to MLB centre-field broadcast at ~60 fps.**
+Measured basis: all 40 sampled `pitches/*/clip.mp4` are 1280x720 at 59.5-59.8 fps,
+which is exactly what the 180 training frames are. The college reel is 1920x1080 at
+30 fps -- more pixels, half the temporal resolution, wrong camera -- and the
+out-of-distribution section above records what that does to the pipeline. The
+intended shape is a user-facing **auto / manual choice** in the labeler, defaulting
+to manual, with auto offered only for clips that pass the MLB-broadcast gate.
+
+## Pipeline
+
+```
+fetchPitchBatch.py      broad sample from local savant_data (10).csv
+fetchLowSlotBatch.py    targeted top-up for sidearm/submarine
+        ↓  pitches/<game_pk>_<play_id>/{clip.mp4, meta.json}
+labelServer.py + labelTool.html/js →  labels.csv (32-column writes)
+                                 →  localLabels.csv (separate college/local data)
+        ↓
+AnglePredictor.py       label QA → held-out accuracy → --save model.joblib
+
+features.py             FEATURE_COLS + pixelAngle, shared by all of the above
+phase4/                 replacing the clicking with a keypoint model
+```
+
+`savantUtils.py` is the shared HTTP layer. `archive/` holds retired scripts.
+
+## Hard-won facts — do not re-derive
+
+**Savant API**
+- `/gf?game_pk=` returns **403** without a browser User-Agent. Handled in `savantUtils.py`.
+- `play_id` is NOT in the Statcast CSV export. Get it from `/gf`, join on
+  `at_bat_number` + `pitch_number` (the feed calls them `ab_number`/`pitch_number`).
+  **Exact join, ~98-100% match** — no fuzzy inning/count/batter matching needed.
+- `venue_id` is only in `/gf`, never in the Statcast CSV.
+- mp4 URL must be scraped from the `sporty-videos` page `<video><source>` tag.
+- The arm-angle leaderboard exports CSV with `&csv=true`. Its `ball_angle` column
+  is the pitcher's average arm angle.
+
+**How Statcast defines arm_angle** — from `relative_shoulder_x`/`shoulder_z` to
+`relative_release_ball_x`/`release_ball_z`. It is the **shoulder → BALL** angle in
+the x–z plane (across-field × height, depth discarded). The centre-field camera
+images roughly that same plane, which is why the raw pixel angle is already close.
+
+**Machine limits (Intel Mac, CPU only — MPS unavailable)**
+- yolo11n-pose: ~100 ms/frame.
+- `glove_tracking` detection: **~1210 ms/frame**, and *worse* batched (1452 ms at
+  batch 16, memory pressure). Never run it per-frame.
+- Disk was at 98-99%. Frames are decoded to RAM on demand, never written.
+
+## Dead ends — already tried, do not repeat
+
+1. **Automatic release-frame detection.** Two approaches failed. (a) Ball-leaves-hand:
+   the detector locked onto a white shirt in the crowd. (b) Peak wrist speed + max
+   arm extension: lands in the follow-through. Release frames are picked by hand.
+   `archive/findReleaseFrames.py` documents both. `labels.csv` now holds 180
+   hand-picked release frames, so a third attempt is finally testable.
+2. **Ball auto-detection at release.** Tested at 8 hand-picked release frames:
+   found a plausible ball on **1**, at conf 0.09 (noise). The ball is small,
+   motion-blurred, and against the pitcher's body. Hand-clicked instead.
+3. **Per-park calibration.** Park bias SD 1.22° against a 1.08° sampling-noise
+   floor. Adding per-park intercepts makes held-out RMSE *worse*. Pool.
+4. **Tree models.** RandomForest RMSE 10.8, GradientBoosting 10.2, HistGB 12.5,
+   KNN 15.6, SVR-RBF 13.7 — all worse than no model. Trees cannot extrapolate:
+   on pitches at true −61°, RandomForest predicts ≈ −22° for every one, because
+   its predictions can never leave the training range.
+5. **`Pitcher_Motion_Data.csv`** (deleted). Was a COCO-17 pose dataset, 2021
+   season, 462k frames. No `game_pk`/date/`play_id`, so it could never be joined
+   to per-pitch `arm_angle`.
+
+## Modeling — what is actually true
+
+**Validation must be `GroupKFold` on `pitcher_id`.** A pitcher's arm angle is
+nearly constant, so a random 80/20 split leaves **67% of the test set
+contaminated** and flatters RandomForest from RMSE 10.3 to 3.3.
+
+**Features (12).** `ball_angle` + `wrist_angle` + the 10 raw keypoint coordinates.
+
+| features | RMSE |
+|---|---|
+| raw pixels only | 5.04 |
+| `ball_angle` only | 3.23 |
+| both | **2.65** |
+
+`ball_angle` absorbs the arctangent; the raw coordinates then correct the
+residual, mostly torso tilt — `shoulder_y` and `off_shoulder_y` come out near
+equal and opposite. Neither half works alone. Do NOT include `frame_index`,
+`img_w`, `img_h`, `venue_id`, `game_pk`.
+
+**Model: Ridge over standardised features.** Lasso/Ridge/OLS/linear-SVR all land
+2.64–2.67 — a tie within noise. Ridge is chosen for coefficient stability, not
+score: with `corr(wrist_x, ball_x) = 0.998`, plain OLS coefficients swing 5.78 on
+average across folds and `ball_y` flips sign. Ridge cuts that swing to 0.31.
+
+**The error floor is per-pitcher, not model-limited.** Between-pitcher bias spread
+is 6.7°; within-pitcher scatter is 2.0°, stable across up to 10 parks each.
+Probably the gap between the *visible* shoulder you click and the modeled shoulder
+joint Statcast uses. You cannot know a new pitcher's offset in advance — which is
+exactly why folds are grouped by pitcher. For a pitcher you HAVE labeled,
+subtracting their measured offset reaches their ~2° within-pitcher scatter.
+
+Also in the floor: ~1.1° of click precision at a 104 px shoulder→ball baseline,
+plus Statcast's own noise.
+
+## Known gaps
+
+- **Sidearm coverage is thin by necessity.** Only 3 pitchers in MLB are below −10°
+  (Rogers −60.8, Hill −21.9, Thompson −12.2). 12 of 180 pitches sit below −30°,
+  all Tyler Rogers. That band has the largest residual bias (−3.09°).
+- Validated on unseen *pitchers*, not unseen seasons or broadcast setups.
+
+## Phase 4 — replacing the clicking (in progress)
+
+Scope is keypoints only: a human still picks the release frame. Everything lives in
+`phase4/`, and `features.py` now holds the single definition of `FEATURE_COLS`,
+`TARGET_COL`, `GROUP_COL` and `pixelAngle`, imported by `labelServer.py`,
+`AnglePredictor.py` and every Phase 4 script — so hand-clicked and predicted
+coordinates cannot go through different arithmetic.
+
+**Note:** the reproducible figure on the current environment is **RMSE 2.651 /
+MAE 2.135**, not the 2.649 / 2.139 recorded earlier. Verified identical before and
+after the refactor, so it is an sklearn version difference, not a regression.
+
+### Step 0 findings — measured, not assumed
+
+**Stage A (find the pitcher) works.** Largest COCO person box contains the clicked
+shoulder on **176/180 (97.8%)**; some box does on 180/180. Judge this on the shoulder
+alone — at release the throwing arm is fully extended and YOLO's box clips the wrist and
+ball, so scoring on those confuses "wrong person" with "box too tight".
+
+**Off-the-shelf pose is not accurate enough**, which is why the labeler overrode it:
+
+| keypoint | COCO median error | in degrees |
+|---|---|---|
+| shoulder | 10.7 px | 5.8 |
+| off_shoulder | 4.8 px | 2.6 |
+| elbow | 7.0 px | 3.8 |
+| wrist | 15.2 px | 8.2 |
+
+**But the Ridge absorbs most of it.** COCO body points + hand-clicked ball → Ridge gives
+**RMSE 3.188 / MAE 2.372**, against 2.651 fully hand-clicked. So the entire body half of
+the problem is worth ~0.54°. **The ball is the whole game** — and nothing off the shelf
+finds it (dead end #2). Conversely, ablation shows a perfect body with no usable ball
+scores 3.23: the ball is worth ~0.6° given everything else.
+
+### Crop geometry — settled by measurement
+
+Square crop centred on the person box, side = **1.6 × box height**, encloses all five
+clicked points on 99.4% of frames (median box height 237 px → ~380 px crop). Stored at
+384 px, so input size is a training flag, not a rebuild. Shoulder-centred crops have a
+better median but a much worse tail (max 2.48× vs 1.89×) — box-centred is the robust choice.
+
+**The crop is derived from the detector box, never from the hand labels.** Deriving it
+from labels at training time and from the detector at inference is the classic top-down
+pose bug: it produces excellent validation numbers and a system that does not work.
+
+### Files
+
+```
+phase4/detect.py         yolo11n-pose over all 180 frames -> detections.json (cached)
+phase4/buildDataset.py   -> crops.npz (180 x 384 x 384) + index.csv
+phase4/dataset.py        loading, flip/jitter augmentation, crop<->frame transforms
+phase4/keypointModel.py  THE MODEL -- to be written
+phase4/evaluate.py       GroupKFold harness, keypoint px error + end-to-end degrees
+phase4/diagnose.py       the step 0 measurements above
+```
+
+Transform round-trips the hand labels to within 1e-4 px, and the harness reproduces
+2.651 exactly on the "hand everything" ablation.
+
+**Flip augmentation uses an identity keypoint mapping**, not the usual left/right swap:
+`shoulder` is the *throwing* shoulder by definition, so mirroring a RHP frame yields a
+valid LHP-looking example with identities unchanged. Doubles n and rebalances 126 R / 54 L.
+
+### Success criteria, set before seeing results
+
+| end-to-end held-out RMSE | reading |
+|---|---|
+| < 4° | strong — near the hand-label ceiling |
+| 4–6° | useful — a real automatic measurement |
+| 6–8° | marginal — worse than raw hand-clicked `ball_angle` at 3.23 |
+| > 8° | under-powered at n=180; the fix is more labels, not more architecture |
+
+### Pipeline status (2026-09-02)
+
+Complete and runnable end to end. `phase4/keypoints.pt` is trained on all 180 pitches
+(soft-argmax head, 28x28 grid, 100 epochs, final loss 0.00625). `predictAngle.py` runs
+play_id -> angle; `analyzeVideo.py` runs the same pipeline over arbitrary footage with
+an `--anchor` override for Stage A.
+
+### 5-fold evaluation — FINISHED 2026-09-08 (1h41m, log in `logs/phase4_eval_5fold_20260908.log`)
+
+`evaluate.py --model resnet --epochs 100 --folds 5`. Predictions in
+`phase4/predictions-resnet.csv`. **Held-out RMSE 13.579 / MAE 6.864** (Ridge refit);
+11.104 / 4.841 with the hand-fit Ridge. Against the pre-set criteria that reads
+*under-powered at n=180* — and it is essentially unchanged from the pre-fix 13.300,
+so the Stage A fix did **not** move the end-to-end number.
+
+**Keypoints themselves improved on COCO** — median full-frame px, held out by pitcher:
+
+| keypoint | this model | COCO | p90 |
+|---|---|---|---|
+| shoulder | 8.9 | 10.7 | 24.0 |
+| off_shoulder | 7.9 | 4.8 | 19.4 |
+| elbow | 12.2 | 7.0 | 40.7 |
+| wrist | **8.5** | 15.2 | 52.1 |
+| ball | **6.7** | none finds it | 45.7 |
+
+Medians are good and it finds the ball, which nothing off the shelf does. **The p90s
+are the problem.** Median-good / tail-catastrophic.
+
+**Where the error actually lives — this is the finding.**
+
+- The **single worst pitch is 53.3% of all squared error**: Pallante at STL, true
+  +50.3, predicted −82.7, error 133°. It is the known Stage A failure —
+  `index.csv` has `stage_a_ok=0, all_inside=0` for it. It is the one crop excluded
+  from training and kept in test by design.
+- **Tyler Rogers' 12 submarine pitches** carry most of what is left: MAE 27.5,
+  every one predicted around −32 against a true −61. Trees-cannot-extrapolate,
+  again, in a different guise.
+- Together, the 32 pitches outside −30..+50 are **86.2% of squared error**.
+- Inside the −30..+50 core (n=148): **RMSE 5.563 / MAE 4.204** — the *useful* band.
+
+Dropping those is not a legitimate score: they are real failures the system would
+make. The pre-registered verdict stands at 13.579. The decomposition says what to
+fix, not what to report.
+
+**Ablation reverses the step-0 expectation.** Each half is fine alone; together they
+explode:
+
+```
+hand body, predicted ball   3.080     <- the predicted BALL costs only 0.43 deg
+hand ball only              4.302     <- the predicted BODY costs 1.65 deg
+hand everything (ceiling)   2.651
+all predicted              13.579     <- neither ablation predicts this
+```
+
+"The ball is the whole game" (step 0) no longer holds — the model learned the ball.
+Both ablations hand-supply a point *in frame coordinates*, which silently repairs a
+bad Stage A crop; that is why neither foresees the 13.579. **End-to-end failure is
+dominated by person selection and by the sidearm tail, not by keypoint precision.**
+
+Implication for the hold: more architecture is not the lever. More labels in the
+tails, plus an abstain signal for Stage A, is.
+
+### Out-of-distribution behaviour -- measured on a college reel
+
+Tested on a Division II recruiting reel (1920x1080, telephoto from behind/beside the
+pitcher, field level). The pipeline produced roughly -60 deg, which is submarine
+territory and plainly wrong -- the pitcher is a three-quarters arm slot.
+
+What broke, in order of severity:
+1. `detect.choosePerson` picked the batter, not the pitcher. Its "bottom-most among the
+   largest" rule encodes the centre-field camera geometry and does not transfer.
+2. The predicted ball landed near the catcher's mitt. No ball is visible in this
+   footage at release, and the model has no way to abstain.
+3. The frames where the arm is extended are heavily motion-blurred.
+
+Off-the-shelf COCO pose transferred fine on the same frames, giving a shoulder->wrist
+angle peaking at +39.9 deg at release. Calibration from labels.csv:
+`true_arm_angle - wrist_angle = +5.21 deg (sd 3.36)`, so that reel is roughly +35 to +45.
+
+**Conclusion: the keypoint model is specific to MLB centre-field broadcast.** That is not
+a defect -- it is what all 180 training frames are -- but it means the model should not
+be pointed at other footage without new labels from that camera. A confidence/abstain
+signal (soft-argmax heatmap peakiness) would let it say so itself.
+
+## Next steps, in order
+
+Reordered 2026-09-08 for the auto-labeling hold. Manual labeling and the release-frame
+model are live; everything under "On hold" is paused mid-flight, not finished.
+
+1. **Retry release detection**, now that 180 hand-picked frames exist to validate
+   against. The untested idea: detect the ball crossing the plate (easy -- plate is
+   static and known), then subtract flight time from `release_speed` /
+   `release_extension`. Agreed within 1 frame on the single pitch checked.
+   This is the live automation thread.
+2. **Keep labeling by hand.** Coverage gaps that matter most: sidearm below -10 deg
+   (3 pitchers league-wide) and any non-MLB camera, which needs its own labels
+   before any model is pointed at it.
+
+### On hold -- auto-labeling (resume here if it comes back)
+
+0. ~~Finish the 5-fold evaluation~~ DONE 2026-09-08: **RMSE 13.579**, under-powered.
+   The Stage A fix did not move the end-to-end number. What the run showed is that
+   the lever is labels and an abstain signal, not architecture -- one Stage A failure
+   is 53% of squared error and Rogers' 12 submarine pitches carry most of the rest.
+   Resuming here means: label the tails (sub -30 deg especially), and give Stage A a
+   way to say "I am not confident this is the pitcher" rather than picking the batter.
+1. ~~Write `phase4/keypointModel.py`~~ DONE — resnet18 + coordinate regression head. The
+   harness drives it through `fit(images, targets)` / `predict(images)`; a
+   `MeanKeypoints` baseline already implements that interface, scores 30.7°, and gives
+   a floor to beat. CPU cost measured: 14 s/epoch at 224, 29 s/epoch at 320.
+2. **`predictAngle.py`** — `play_id` → clip → Stage A → keypoints → `features.py` →
+   Ridge → angle.
+
+## Working notes
+
+- Project convention is camelCase, except `AnglePredictor.py` which is the user's
+  own file and is internally `snake_case`. Keep each file self-consistent.
+- The user is newer to ML and wants to build the modeling himself — explain
+  concepts and let him write the code rather than handing over finished scripts.
+- Always print baselines next to any metric. The first model scored MSE 16.31 with
+  nothing to compare against; the no-model baseline was 10.41.

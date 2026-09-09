@@ -1,0 +1,10 @@
+game_pk,play_id,frame_index,release_time_sec,source_video,release_quality,point_quality,ball_angle,wrist_angle,predicted_arm_angle,feature_mode
+local,e09a36b85f174c86980bd703552bb226,68,2.2666666666666666,/Users/charliecapretta/Downloads/capretta_2026_reel (1).mp4,,,12.744,7.158,8.409767647320006,height720
+local,fce2222aa6c649788bf837d9ef063501,68,2.2666666666666666,/Users/charliecapretta/Downloads/capretta_2026_reel (1).mp4,,,14.523,8.852,9.482918214760069,height720
+local,87b416d9977b4be8acd62398813994f0,167,5.566666666666666,/Users/charliecapretta/Downloads/capretta_2026_reel (1).mp4,,,18.858,9.725,13.028261876391362,height720
+local,bb79482662ef48489ec64483de91179b,291,9.7,/Users/charliecapretta/Downloads/capretta_2026_reel (1).mp4,,,15.194,5.867,9.106426030629933,height720
+local,ce98ea6999594f89ab1fd2e86e194833,403,13.433333333333334,/Users/charliecapretta/Downloads/capretta_2026_reel (1).mp4,,,12.586,4.164,6.423832062691458,height720
+local,8a31b885836b433ba2223ff6f1a94943,526,17.53333333333333,/Users/charliecapretta/Downloads/capretta_2026_reel (1).mp4,,,14.506,7.906,10.727445535694894,height720
+local,de354d55772d4e98863a3b7b4a668fc8,631,21.03333333333333,/Users/charliecapretta/Downloads/capretta_2026_reel (1).mp4,,,14.429,8.611,8.669469913182493,height720
+local,d5107dcb9f914948bbbdf4689da81b9e,751,25.03333333333333,/Users/charliecapretta/Downloads/capretta_2026_reel (1).mp4,,,12.429,5.774,7.925545892286179,height720
+local,a700681bdbfd47c9b33ba5d447442ab4,751,25.03333333333333,/Users/charliecapretta/Downloads/capretta_2026_reel (1).mp4,,,18.198,13.832,12.666185378343888,height720
