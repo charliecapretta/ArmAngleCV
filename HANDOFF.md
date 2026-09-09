@@ -131,7 +131,24 @@ images roughly that same plane, which is why the raw pixel angle is already clos
    arm extension: lands in the follow-through. Release frames are picked by hand.
    `archive/findReleaseFrames.py` documents both. `labels.csv` now holds 180
    hand-picked release frames, so a third attempt is finally testable.
-2. **Ball auto-detection at release.** Tested at 8 hand-picked release frames:
+2. **Ball auto-detection at release.** Retested 2026-09-08 with the two models it
+   had never used -- `archive/baseballCvExample.py` chose `glove_tracking` for its
+   4-class output, so BaseballCV's purpose-built ball models were never tried. Both
+   downloaded (114 MB each, now in the gitignored `models/`) and measured on 10
+   hand-clicked release frames:
+
+   | model | within 15 px | within 30 px | median dist | speed |
+   |---|---|---|---|---|
+   | `ball_tracking` | 0/10 | 2/10 | 105.6 px | 1226 ms/frame |
+   | `ball_trackingv4` | 0/10 | 0/10 | 64.9 px (0 detections median) | 847 ms/frame |
+
+   Note `ball_tracking` ships with placeholder class names (`a`..`f`), so filtering
+   detections by a class called "ball" silently returns nothing -- take all boxes.
+   In flight (f0+2..f0+13) it emits 3-4 detections per frame but naive association
+   produced a monotonic outward track on only 1 of 6 clips. **The purpose-built
+   models do not solve this either.** Original finding below stands.
+
+   Tested at 8 hand-picked release frames:
    found a plausible ball on **1**, at conf 0.09 (noise). The ball is small,
    motion-blurred, and against the pitcher's body. Hand-clicked instead.
 3. **Per-park calibration.** Park bias SD 1.22° against a 1.08° sampling-noise
