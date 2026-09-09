@@ -1,0 +1,26 @@
+{
+  "labeled_pitches": 192,
+  "trajectory_available": 115,
+  "legacy_minus_trajectory_ms": {
+    "n": 115,
+    "mean": 27.9723244190202,
+    "median": 27.72333544181027,
+    "min": 22.009724474393757,
+    "max": 39.789754740661486
+  },
+  "simple_096_minus_trajectory_ms": {
+    "n": 115,
+    "mean": -3.0051855037726614,
+    "median": -2.7202768123048005,
+    "min": -10.71116306538622,
+    "max": 0.9797613963541396
+  },
+  "back_vs_front_ms": {
+    "n": 115,
+    "mean": 12.305807758806377,
+    "median": 12.029262306938737,
+    "min": 10.723805757490378,
+    "max": 18.723248441326668
+  },
+  "note": "Formula comparison against a trajectory approximation, not observed flight-time accuracy."
+}

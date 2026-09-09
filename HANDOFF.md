@@ -346,11 +346,43 @@ signal (soft-argmax heatmap peakiness) would let it say so itself.
 Reordered 2026-09-08 for the auto-labeling hold. Manual labeling and the release-frame
 model are live; everything under "On hold" is paused mid-flight, not finished.
 
-1. **Retry release detection**, now that 180 hand-picked frames exist to validate
-   against. The untested idea: detect the ball crossing the plate (easy -- plate is
-   static and known), then subtract flight time from `release_speed` /
-   `release_extension`. Agreed within 1 frame on the single pitch checked.
-   This is the live automation thread.
+1. ~~Retry release detection~~ **MEASURED 2026-09-08 -- do not restart from scratch.**
+   Four experiments, scripts in `reports/release_detection/`:
+
+   **The clips are cut consistently, so a constant beats everything tried.**
+   Release `frame_index` over 196 labels: median 178, and a fixed "frame 178"
+   predictor lands within +/-2 frames on 61.7%, +/-5 on 87.2%, median error 2.0
+   frames. This is an artifact of how Savant cuts clips -- it is worth nothing on a
+   user's own footage -- but on MLB clips it is free and it is the bar any method
+   must clear.
+
+   **Peak wrist speed is dead, and not for the reason previously assumed.** It does
+   not miss release by a fixed offset that 196 labels could calibrate away: measured
+   offset median -1.0 frames but **sd 7.25**, and after removing the median only 21%
+   land within +/-1 frame. Worse than the constant. Do not revisit.
+
+   **The camera is locked** -- median border frame-diff **0.00** across sampled
+   clips -- so motion differencing is available where the appearance detector of dead
+   end #2 failed. It half works:
+   - Single-frame differencing at release: a blob within 15 px of the hand-clicked
+     ball on 3/10, but **~470 candidate blobs per frame**. Unusable for initialisation.
+   - Seeded from the true ball position, the track survives >=4 frames on 8/10.
+     But screening those tracks for ball-like motion (step CV < 0.6, straightness
+     > 0.85, mean step > 8 px) leaves only **3/10**. The rest drift onto the pitcher
+     or noise -- one track moved 31 px in 10 frames, far too slow for a thrown ball.
+
+   **Conclusion: no automatic method currently beats the constant on MLB clips, and
+   none works at all on user footage.** Release selection stays manual. The remaining
+   untested idea is the plate-crossing one -- flight time is exactly computable from
+   the 9-parameter trajectory (`vx0..az` are all present in `savant_data (10).csv`,
+   though NOT in `meta.json`) -- but it is MLB-only by construction, since a user's
+   video has no Statcast row.
+
+   **Timing sensitivity, for whoever picks this up:** shoulder->wrist angle moves a
+   median 7.8 deg at +/-1 frame, 17.3 at +/-2, 30.9 at +/-3. Treat the +/-1 figure as
+   an upper bound -- COCO's own wrist error is 8.2 deg, so at one frame the signal and
+   the noise are the same size. The +/-2 and +/-3 figures are real motion. Any
+   automatic method needs +/-1 frame to be worth having.
 2. **Keep labeling by hand.** Coverage gaps that matter most: sidearm below -10 deg
    (3 pitchers league-wide) and any non-MLB camera, which needs its own labels
    before any model is pointed at it.
