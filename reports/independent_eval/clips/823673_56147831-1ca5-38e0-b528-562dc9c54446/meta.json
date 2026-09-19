@@ -1,0 +1,22 @@
+{
+  "evalId": "eval16",
+  "gamePk": 823673,
+  "gameDate": "2026-08-11",
+  "pitcherId": 641927,
+  "pitcherName": "Ober, Bailey",
+  "pThrows": "R",
+  "pitchType": "CH",
+  "releaseSpeed": 83.3,
+  "atBatNumber": 15,
+  "pitchNumber": 2,
+  "inning": 2,
+  "homeTeam": "MIN",
+  "awayTeam": "BAL",
+  "playId": "56147831-1ca5-38e0-b528-562dc9c54446",
+  "venueId": 3312,
+  "clipPath": "clips/823673_56147831-1ca5-38e0-b528-562dc9c54446/clip.mp4",
+  "nFrames": 377,
+  "imgW": 1280,
+  "imgH": 720,
+  "fps": 59.561007463996575
+}

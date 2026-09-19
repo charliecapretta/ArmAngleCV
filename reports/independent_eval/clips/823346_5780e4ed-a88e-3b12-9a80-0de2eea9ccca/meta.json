@@ -1,0 +1,22 @@
+{
+  "evalId": "eval13",
+  "gamePk": 823346,
+  "gameDate": "2026-08-14",
+  "pitcherId": 663558,
+  "pitcherName": "Mor\u00e1n, Jovani",
+  "pThrows": "L",
+  "pitchType": "CH",
+  "releaseSpeed": 84.5,
+  "atBatNumber": 43,
+  "pitchNumber": 3,
+  "inning": 5,
+  "homeTeam": "PIT",
+  "awayTeam": "BOS",
+  "playId": "5780e4ed-a88e-3b12-9a80-0de2eea9ccca",
+  "venueId": 31,
+  "clipPath": "clips/823346_5780e4ed-a88e-3b12-9a80-0de2eea9ccca/clip.mp4",
+  "nFrames": 448,
+  "imgW": 1280,
+  "imgH": 720,
+  "fps": 59.66730151965159
+}

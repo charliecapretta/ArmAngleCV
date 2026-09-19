@@ -18,7 +18,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--labels', default=str(root/'localLabels.csv'))
     parser.add_argument('--model', default=str(root/angleInputs.DEFAULT_MODEL))
-    parser.add_argument('--out', default=str(root/'reports/hand_label_predictions/resolution_safe_predictions.csv'))
+    parser.add_argument('--out', default=str(root/'predictions.csv'))
     args = parser.parse_args()
     labels, out, model = Path(args.labels).resolve(), Path(args.out).resolve(), Path(args.model).resolve()
     if out in (labels, model):

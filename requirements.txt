@@ -7,10 +7,8 @@ pandas==2.3.3
 scikit-learn==1.9.0
 joblib==1.5.3
 opencv-python==4.11.0.86
+scipy==1.17.1
 
-# Only needed to fetch MLB clips (fetchPitchBatch.py, fetchLowSlotBatch.py):
-#   requests==2.34.2
-# Only needed for the Phase 4 keypoint model, which is on hold:
-#   torch==2.2.2
-#   torchvision==0.17.2
-#   ultralytics==8.4.124
+# Python 3.12 is the supported release environment.
+# To download MLB examples, also install requirements-fetch.txt.
+# Pose suggestions and Phase 4 are experimental; see docs/RESEARCH.md.

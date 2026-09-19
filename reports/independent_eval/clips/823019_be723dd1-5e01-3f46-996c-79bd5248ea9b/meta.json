@@ -1,0 +1,22 @@
+{
+  "evalId": "eval04",
+  "gamePk": 823019,
+  "gameDate": "2026-08-11",
+  "pitcherId": 657571,
+  "pitcherName": "Ferguson, Caleb",
+  "pThrows": "L",
+  "pitchType": "SI",
+  "releaseSpeed": 91.7,
+  "atBatNumber": 53,
+  "pitchNumber": 5,
+  "inning": 8,
+  "homeTeam": "STL",
+  "awayTeam": "PHI",
+  "playId": "be723dd1-5e01-3f46-996c-79bd5248ea9b",
+  "venueId": 2889,
+  "clipPath": "clips/823019_be723dd1-5e01-3f46-996c-79bd5248ea9b/clip.mp4",
+  "nFrames": 480,
+  "imgW": 1280,
+  "imgH": 720,
+  "fps": 59.6454409896725
+}

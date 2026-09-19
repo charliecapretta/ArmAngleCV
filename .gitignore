@@ -6,6 +6,7 @@
 # labels.csv keys on game_pk + play_id, so the labels survive without the video.
 pitches/
 releaseFrames/
+reports/independent_eval/clips/**/*.mp4
 
 # Model weights and derived arrays. All rebuildable; none belong in git.
 #   models/od/.../glove_tracking.pt is 109 MB -- GitHub HARD-REJECTS files over 100 MB.
@@ -40,10 +41,20 @@ cache/
 # labelServer.py creates all of these on demand (readLabelFile / readLocalVideos
 # both return [] when the file is absent), so a fresh clone starts clean.
 #
-# labels.csv is NOT ignored: it is the 192 MLB pitches the shipped model was
-# trained on, and the provenance of every number in HANDOFF.md.
+# labels.csv is the current development dataset. The shipped manual-v1 model
+# was trained on the separate, immutable data/manual-v1/labels.csv snapshot.
 localVideos.json
 localLabels.csv
 analysisLabels.csv
 *.before-streamlined
 labels.backup-*.csv
+
+# Editor settings, private prediction outputs, and prepared release copies.
+.idea/
+reports/hand_label_predictions/
+release/
+localReleaseFrames/
+predictions.csv
+
+# Uploaded videos belong to the local user, never a release.
+uploads/

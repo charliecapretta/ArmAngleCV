@@ -1,66 +1,104 @@
-"""Add a small, separate MLB UI trial batch without replacing existing manifests."""
+"""Restore the fixed MLB example clips without changing the manifest or labels."""
+import argparse
 import json
+import os
 from pathlib import Path
-import numpy as np
-import pandas as pd
+import re
+import tempfile
+
 import savantUtils as s
-from fetchPitchBatch import loadStatcast,buildMeta,PREFERRED_DESCRIPTIONS
 from labelServer import probeClip
-ROOT=Path(__file__).resolve().parent
-BATCH=ROOT/'uiTestBatch.json'
+
+ROOT = Path(__file__).resolve().parent
+BATCH = ROOT / 'uiTestBatch.json'
+
+
+def manifestPitches(path):
+    records = json.loads(Path(path).read_text())['pitches']
+    if not isinstance(records, list) or not records:
+        raise ValueError('The manifest must contain a non-empty pitches list')
+    seen = set()
+    for record in records:
+        if not isinstance(record, dict):
+            raise ValueError('Every manifest pitch must be an object')
+        game, play = str(record.get('gamePk', '')), str(record.get('playId', ''))
+        if not game.isdigit() or not re.fullmatch(r'[a-zA-Z0-9-]+', play):
+            raise ValueError('Invalid pitch identifier in manifest')
+        key = (game, play)
+        if key in seen:
+            raise ValueError('Duplicate pitch in manifest')
+        seen.add(key)
+    return records
+
+
+def usableClip(path):
+    if not Path(path).is_file():
+        return False
+    info = probeClip(str(path))
+    return bool(info and info['nFrames'] > 0 and info['imgW'] > 0 and info['imgH'] > 0)
+
+
+def restorePitches(records, pitchesDir, session=None):
+    """Keep healthy clips, restore missing metadata, and replace only verified downloads."""
+    failures = []
+    ownsSession = False
+    try:
+        for record in records:
+            name = s.pitchDirName(record['gamePk'], record['playId'])
+            directory = Path(pitchesDir) / name
+            clip, metaPath = directory / 'clip.mp4', directory / 'meta.json'
+            temporary = None
+            try:
+                directory.mkdir(parents=True, exist_ok=True)
+                if not usableClip(clip):
+                    if session is None:
+                        session = s.makeSession()
+                        ownsSession = True
+                    url = s.resolveClipUrl(record['playId'], session)
+                    if not url:
+                        raise ValueError('The source page has no downloadable clip')
+                    fd, temporary = tempfile.mkstemp(dir=directory, prefix='.download-', suffix='.mp4')
+                    os.close(fd)
+                    if not s.downloadClip(url, temporary, session) or not usableClip(temporary):
+                        raise ValueError('Downloaded clip could not be decoded')
+                    os.replace(temporary, clip)
+                if not metaPath.exists():
+                    # Preserve existing metadata and annotations. Restore a missing
+                    # metadata file from the same committed source record.
+                    metaPath.write_text(json.dumps(record, indent=2) + '\n')
+                print(f'Ready: {name}', flush=True)
+            except (OSError, ValueError, RuntimeError, ModuleNotFoundError) as error:
+                failures.append(name)
+                print(f'Unavailable: {name}: {error}', flush=True)
+                if isinstance(error, ModuleNotFoundError):
+                    print('Install download support: python -m pip install -r requirements-fetch.txt')
+            finally:
+                if temporary:
+                    Path(temporary).unlink(missing_ok=True)
+                    Path(temporary + '.part').unlink(missing_ok=True)
+    finally:
+        if ownsSession:
+            session.close()
+    return failures
+
 
 def main():
-    if BATCH.exists():
-        existing=json.loads(BATCH.read_text())
-        if len(existing.get('pitches',[]))>=12:
-            print('UI batch already available:',len(existing['pitches']));return
-    else:existing={'name':'MLB UI trial · September 8','pitches':[]}
-    table=loadStatcast(str(ROOT/'savant_data (10).csv'))
-    table=table[table.arm_angle.notna() & table.description.isin(PREFERRED_DESCRIPTIONS)].copy()
-    # Local cached feeds already carry exact pitch-to-play joins.
-    feeds=[];infos={};session=s.makeSession()
-    for file in sorted(Path(s.CACHE_DIR).glob('*.json')):
-        try:
-            pk=int(file.stem)
-            if pk not in table.game_pk.values:continue
-            feed,info=s.playIdsForGame(pk,session)
-            if not feed.empty:feeds.append(feed);infos[pk]=info
-        except (ValueError,KeyError):continue
-    if not feeds:
-        selected=[];pitchers=set()
-        for target in np.linspace(-60,75,12):
-            candidates=table[~table.pitcher.isin(pitchers)].copy()
-            candidates['distance']=abs(candidates.arm_angle-target)
-            row=candidates.sort_values('distance').iloc[0]
-            selected.append(int(row.game_pk));pitchers.add(int(row.pitcher))
-        for pk in dict.fromkeys(selected):
-            try:
-                feed,info=s.playIdsForGame(pk,session)
-                if not feed.empty:feeds.append(feed);infos[pk]=info
-                print('Resolved game',pk,flush=True)
-            except Exception as error:print('Game unavailable',pk,str(error),flush=True)
-    if not feeds:raise RuntimeError('Could not resolve any game feeds')
-    pool=table.merge(pd.concat(feeds,ignore_index=True),on=['game_pk','at_bat_number','pitch_number'])
-    pool=pool[~pool.apply(lambda r:(Path(s.PITCHES_DIR)/s.pitchDirName(int(r.game_pk),r.play_id)/'clip.mp4').exists(),axis=1)]
-    used={p['pitcherId'] for p in existing['pitches']};attempted=set();records=existing['pitches']
-    for target in np.linspace(-60,75,12):
-        if len(records)>=12:break
-        candidates=pool[~pool.pitcher.isin(used) & ~pool.play_id.isin(attempted)].copy()
-        candidates['distance']=abs(candidates.arm_angle-target)
-        for _,row in candidates.sort_values('distance').head(3).iterrows():
-            attempted.add(row.play_id);pk=int(row.game_pk);directory=Path(s.PITCHES_DIR)/s.pitchDirName(pk,row.play_id)
-            try:
-                url=s.resolveClipUrl(row.play_id,session)
-                if not url:continue
-                directory.mkdir(parents=True,exist_ok=True)
-                if not s.downloadClip(url,str(directory/'clip.mp4'),session):continue
-                info=probeClip(str(directory/'clip.mp4'))
-                if not info or not info['nFrames']:continue
-                meta=buildMeta(row,row.play_id,infos[pk]);meta['uiTestBatch']=True
-                (directory/'meta.json').write_text(json.dumps(meta,indent=2))
-                records.append(meta);used.add(int(row.pitcher));BATCH.write_text(json.dumps({'name':existing['name'],'pitches':records},indent=2))
-                print(f"{len(records)}/12 {meta['pitcherName']} {meta['homeTeam']} {meta['armAngle']:+.1f} deg {info['fps']:.2f}fps",flush=True)
-                break
-            except Exception as e:print('Could not fetch',row.play_id,str(e),flush=True)
-    print('Added',len(records),'new clips. Existing clips, labels, and manifest unchanged.',flush=True)
-if __name__=='__main__':main()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--manifest', type=Path, default=BATCH)
+    parser.add_argument('--out-dir', type=Path, default=Path(s.PITCHES_DIR))
+    parser.add_argument('--limit', type=int, help='Restore only the first N examples')
+    args = parser.parse_args()
+    if args.limit is not None and args.limit < 1:
+        parser.error('--limit must be positive')
+    try:
+        records = manifestPitches(args.manifest)
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        parser.error(f'Could not read manifest: {error}')
+    records = records[:args.limit]
+    failures = restorePitches(records, args.out_dir)
+    print(f'{len(records)-len(failures)}/{len(records)} examples ready. Manifest and labels unchanged.')
+    return 1 if failures else 0
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())

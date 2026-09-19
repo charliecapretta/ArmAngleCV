@@ -1,0 +1,33 @@
+name: Manual workflow
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install manual dependencies only
+        run: python -m pip install -r requirements.txt
+      - name: Python tests including isolated server startup and export
+        run: python -m unittest discover -s tests -v
+      - name: Browser workflow logic
+        run: node --test tests/labelTool.test.cjs
+      - name: Verify frozen model and data provenance
+        run: python tools/checkRelease.py
+      - name: Build the public file set
+        run: python tools/prepareRelease.py --out release/public

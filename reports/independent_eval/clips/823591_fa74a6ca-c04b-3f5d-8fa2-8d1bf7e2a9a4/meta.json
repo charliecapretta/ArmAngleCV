@@ -1,0 +1,22 @@
+{
+  "evalId": "eval08",
+  "gamePk": 823591,
+  "gameDate": "2026-08-14",
+  "pitcherId": 674841,
+  "pitcherName": "Alvarez, Andrew",
+  "pThrows": "L",
+  "pitchType": "CH",
+  "releaseSpeed": 86.3,
+  "atBatNumber": 31,
+  "pitchNumber": 3,
+  "inning": 4,
+  "homeTeam": "NYM",
+  "awayTeam": "WSH",
+  "playId": "fa74a6ca-c04b-3f5d-8fa2-8d1bf7e2a9a4",
+  "venueId": 3289,
+  "clipPath": "clips/823591_fa74a6ca-c04b-3f5d-8fa2-8d1bf7e2a9a4/clip.mp4",
+  "nFrames": 416,
+  "imgW": 1280,
+  "imgH": 720,
+  "fps": 59.5591288204779
+}

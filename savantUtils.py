@@ -15,8 +15,6 @@ import time
 import random
 
 import pandas as pd
-import requests
-from bs4 import BeautifulSoup
 
 BROWSER_UA = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -36,6 +34,7 @@ MAX_RETRIES = 4
 
 def makeSession():
     """Session carrying the browser UA. Required -- bare requests/urllib get a 403."""
+    import requests  # Optional download dependencies; the manual server is offline.
     session = requests.Session()
     session.headers.update({
         "User-Agent": BROWSER_UA,
@@ -47,6 +46,7 @@ def makeSession():
 
 def politeGet(url, session, timeout=45, stream=False):
     """GET with backoff on 429/5xx. Raises on final failure."""
+    import requests
     lastError = None
     for attempt in range(MAX_RETRIES):
         try:
@@ -124,6 +124,7 @@ def playIdsForGame(gamePk, session, useCache=True):
 
 def resolveClipUrl(playId, session):
     """Scrape the mp4 URL off the sporty-videos page. Returns None if absent."""
+    from bs4 import BeautifulSoup
     response = politeGet(VIDEO_PAGE_URL.format(playId=playId), session)
     soup = BeautifulSoup(response.text, "html.parser")
 

@@ -1,0 +1,22 @@
+{
+  "evalId": "eval15",
+  "gamePk": 824480,
+  "gameDate": "2026-08-15",
+  "pitcherId": 676534,
+  "pitcherName": "Faucher, Calvin",
+  "pThrows": "R",
+  "pitchType": "FC",
+  "releaseSpeed": 92.1,
+  "atBatNumber": 46,
+  "pitchNumber": 5,
+  "inning": 5,
+  "homeTeam": "CIN",
+  "awayTeam": "MIA",
+  "playId": "6f6e268e-b2f4-30d1-b9e7-70409e5044ee",
+  "venueId": 2602,
+  "clipPath": "clips/824480_6f6e268e-b2f4-30d1-b9e7-70409e5044ee/clip.mp4",
+  "nFrames": 370,
+  "imgW": 1280,
+  "imgH": 720,
+  "fps": 59.541796374208566
+}

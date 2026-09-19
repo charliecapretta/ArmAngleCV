@@ -41,12 +41,15 @@ from collections import OrderedDict
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 
 import savantUtils
+import analysisExport
+import videoUploads
 from features import deriveAngles
 
 LABELS_PATH = os.path.join(savantUtils.PROJECT_DIR, "labels.csv")
 LOCAL_LABELS_PATH = os.path.join(savantUtils.PROJECT_DIR, "localLabels.csv")
 LOCAL_VIDEOS_PATH = os.path.join(savantUtils.PROJECT_DIR, "localVideos.json")
 ANALYSIS_LABELS_PATH = os.path.join(savantUtils.PROJECT_DIR, "analysisLabels.csv")
+UPLOADS_PATH = os.path.join(savantUtils.PROJECT_DIR, "uploads")
 
 # Column order is append-only: the first 17 are the original schema, so rows
 # written before the 5-point expansion stay readable and simply carry blanks.
@@ -269,7 +272,7 @@ def readLocalVideos():
     if not os.path.exists(LOCAL_VIDEOS_PATH):
         return []
     with open(LOCAL_VIDEOS_PATH) as handle:
-        return json.load(handle)
+        return [analysisExport.enrichPitch(p) for p in json.load(handle)]
 
 
 def relativeSourceVideo(path):
@@ -308,6 +311,14 @@ def atomicWrite(path, write):
 
 
 def registerLocalVideo(payload):
+    if payload.get('parentId'):
+        parent = next((p for p in readLocalVideos() if p['playId'] == payload['parentId']), None)
+        if parent is None:
+            raise ValueError('The source video could not be found.')
+        payload = dict(payload, path=parent['sourcePath'], sessionId=parent['sessionId'],
+                       sessionName=parent['sessionName'], sourceName=parent['sourceName'],
+                       pitcherName=parent.get('pitcherName', ''), park=parent.get('park', ''),
+                       pThrows=parent.get('pThrows', 'R'))
     path = os.path.abspath(os.path.expanduser(str(payload.get("path", ""))))
     if not os.path.isfile(path):
         raise ValueError("Video file not found. Paste its full local path.")
@@ -322,7 +333,9 @@ def registerLocalVideo(payload):
         raise ValueError("Starting frame is outside this video.")
     playId = uuid.uuid4().hex
     pitch = {"gamePk": "local", "playId": playId, "dirName": "local_" + playId,
-             "sourcePath": path, "sourceName": os.path.basename(path),
+             "sourcePath": path, "sourceName": payload.get('sourceName') or os.path.basename(path),
+             "sessionId": payload.get('sessionId') or analysisExport.sessionId({'sourcePath': path}),
+             "sessionName": str(payload.get('sessionName') or payload.get('park') or os.path.basename(path))[:160],
              "pitcherName": str(payload.get("pitcherName", "")), "pThrows": throws,
              "park": str(payload.get("park", "")), "armAngle": None,
              "startFrame": startFrame, "isLocal": True, **info}
@@ -360,7 +373,7 @@ def listPitches():
             "uiTestBatch": bool(meta.get("uiTestBatch")),
             **info,
         })
-    return readLocalVideos() + pitches
+    return readLocalVideos() + [analysisExport.enrichPitch(p) for p in pitches]
 
 
 _pitcherCache = {}
@@ -598,13 +611,9 @@ manualAngleBundle = None
 manualAngleLock = threading.Lock()
 
 
-def predictManualAngle(payload):
-    """Read-only prediction using the versioned model for manually clicked points."""
+def getManualAngleBundle():
     import angleInputs
     from joblib import load
-    if payload.get("status") != "labeled":
-        raise ValueError("Five visible points are required for this angle model")
-    row = validateLabel(payload)  # Source dimensions come from the decoded clip.
     global manualAngleBundle
     with manualAngleLock:
         if manualAngleBundle is None:
@@ -612,10 +621,20 @@ def predictManualAngle(payload):
             if not os.path.exists(path):
                 raise ValueError("The resolution-normalized angle model is not available")
             manualAngleBundle = load(path)
-        value = float(angleInputs.predict(manualAngleBundle, [row])[0])
+    return manualAngleBundle
+
+
+def predictManualAngle(payload):
+    """Read-only prediction using the versioned model for manually clicked points."""
+    import angleInputs
+    if payload.get("status") != "labeled":
+        raise ValueError("Five visible points are required for this angle model")
+    row = validateLabel(payload)  # Source dimensions come from the decoded clip.
+    bundle = getManualAngleBundle()
+    value = float(angleInputs.predict(bundle, [row])[0])
     return {"ok": True, "predicted_arm_angle": value,
-            "feature_mode": manualAngleBundle["feature_mode"],
-            "note": "MLB-trained estimate; college accuracy is unverified."}
+            "feature_mode": bundle["feature_mode"], "model_version": analysisExport.MODEL_VERSION,
+            "note": analysisExport.ESTIMATE_SCOPE}
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -648,7 +667,7 @@ class Handler(SimpleHTTPRequestHandler):
         workspace = (query.get("workspace") or [None])[0]
         if workspace not in (None, "training", "analysis"):
             return self.sendJson({"error": "Unknown workspace"}, 400)
-        if parsed.path == "/analyze.html":
+        if parsed.path in ("/", "/index.html", "/analyze.html"):
             with open(os.path.join(savantUtils.PROJECT_DIR, "labelTool.html"), "r") as handle:
                 html = handle.read().replace('data-workspace="training"', 'data-workspace="analysis"')
             body = html.encode("utf-8")
@@ -657,6 +676,26 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "no-store")
             self.end_headers(); self.wfile.write(body)
+            return
+        if parsed.path == '/api/export':
+            try:
+                session = (query.get('session') or [''])[0]
+                with writeLock:
+                    rows = readLabels('analysis')
+                    pitches = readLocalVideos()
+                # Include analysis practice examples without loading their video pixels.
+                if not any(p['sessionId'] == session for p in pitches):
+                    pitches = listPitches()
+                body = analysisExport.exportCsv(rows, pitches, getManualAngleBundle(), session).encode('utf-8-sig')
+                self.send_response(200)
+                self.send_header('Content-Type', 'text/csv; charset=utf-8')
+                self.send_header('Content-Disposition', 'attachment; filename="arm-angle-session.csv"')
+                self.send_header('Content-Length', str(len(body)))
+                self.send_header('Cache-Control', 'no-store')
+                self.end_headers()
+                self.wfile.write(body)
+            except (ValueError, OSError) as error:
+                self.sendJson({'error': str(error)}, 400)
             return
         if parsed.path == "/api/pitches":
             pitches = listPitches()
@@ -734,6 +773,8 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_POST(self):
         parsed = urllib.parse.urlparse(self.path)
+        if parsed.path == '/api/upload':
+            return self.receiveUpload(parsed)
         if parsed.path not in ("/api/label", "/api/import", "/api/delete-label", "/api/undo", "/api/predict-angle"):
             return self.sendJson({"error": "not found"}, 404)
         try:
@@ -760,22 +801,62 @@ class Handler(SimpleHTTPRequestHandler):
         except OSError:
             return self.sendJson({"error": "Could not save to disk. Your previous labels are intact."}, 500)
 
+    def receiveUpload(self, parsed):
+        """Stream the raw file body to an isolated name, then validate before registration."""
+        path = None
+        registered = False
+        try:
+            query = urllib.parse.parse_qs(parsed.query)
+            payload = {key: values[0] for key, values in query.items()}
+            name = os.path.basename(payload.get('filename', '').replace('\\', '/'))
+            if not name.lower().endswith('.mp4') or len(name) > 240:
+                raise ValueError('Choose an MP4 video file.')
+            length = int(self.headers.get('Content-Length') or 0)
+            if not 0 < length <= videoUploads.MAX_BYTES:
+                raise ValueError('Choose an MP4 no larger than 100 MB.')
+            if payload.get('pThrows', 'R') not in ('R', 'L'):
+                raise ValueError('Choose R or L for the throwing hand.')
+            os.makedirs(UPLOADS_PATH, exist_ok=True)
+            session = uuid.uuid4().hex
+            path = os.path.join(UPLOADS_PATH, session + '.mp4')
+            self.connection.settimeout(120)
+            with open(path, 'xb') as handle:
+                remaining = length
+                while remaining:
+                    chunk = self.rfile.read(min(1024 * 1024, remaining))
+                    if not chunk:
+                        raise ValueError('Upload was interrupted. Choose the file and try again.')
+                    handle.write(chunk)
+                    remaining -= len(chunk)
+            videoUploads.validateVideo(path)
+            pitch = registerLocalVideo(dict(path=path, sourceName=name, sessionId=session,
+                                            sessionName=payload.get('sessionName') or os.path.splitext(name)[0],
+                                            pitcherName=payload.get('pitcherName', '')[:160],
+                                            pThrows=payload.get('pThrows', 'R')))
+            registered = True
+            return self.sendJson({'ok': True, 'pitch': pitch})
+        except (ValueError, OSError) as error:
+            self.close_connection = True
+            return self.sendJson({'error': str(error) if isinstance(error, ValueError) else
+                                 'Upload could not be saved. Check free disk space and try again.'}, 400)
+        finally:
+            if path and not registered and os.path.exists(path):
+                os.unlink(path)
+
 
 def main():
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8777
     pitches = listPitches()
+    httpd = ThreadingHTTPServer(("127.0.0.1", port), Handler)
     print(f"Serving {savantUtils.PROJECT_DIR}")
     print(f"{len(pitches)} pitches with clips (frames decoded on demand)")
     if not pitches:
         print("  (none yet -- open a local video in the labeler, or run fetchPitchBatch.py)")
     print(f"Labels -> {LABELS_PATH}")
-    print(f"\n  open http://127.0.0.1:{port}/labelTool.html\n", flush=True)
+    print(f"\n  open http://127.0.0.1:{httpd.server_port}/index.html\n", flush=True)
 
-    # Warm the pose model off the request path -- cold load is ~8s, which would
-    # otherwise land on the first seed of the session.
-    threading.Thread(target=getPoseModel, daemon=True).start()
-
-    ThreadingHTTPServer(("127.0.0.1", port), Handler).serve_forever()
+    with httpd:
+        httpd.serve_forever()
 
 
 if __name__ == "__main__":

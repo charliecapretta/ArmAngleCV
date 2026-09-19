@@ -1,0 +1,22 @@
+{
+  "evalId": "eval18",
+  "gamePk": 824479,
+  "gameDate": "2026-08-14",
+  "pitcherId": 641941,
+  "pitcherName": "Pag\u00e1n, Emilio",
+  "pThrows": "R",
+  "pitchType": "FF",
+  "releaseSpeed": 96.1,
+  "atBatNumber": 64,
+  "pitchNumber": 1,
+  "inning": 9,
+  "homeTeam": "CIN",
+  "awayTeam": "MIA",
+  "playId": "7cd39949-361b-3328-81fe-588dd818ef7a",
+  "venueId": 2602,
+  "clipPath": "clips/824479_7cd39949-361b-3328-81fe-588dd818ef7a/clip.mp4",
+  "nFrames": 404,
+  "imgW": 1280,
+  "imgH": 720,
+  "fps": 59.601183499848375
+}

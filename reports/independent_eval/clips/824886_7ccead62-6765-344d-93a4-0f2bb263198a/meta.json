@@ -1,0 +1,22 @@
+{
+  "evalId": "eval25",
+  "gamePk": 824886,
+  "gameDate": "2026-08-11",
+  "pitcherId": 628452,
+  "pitcherName": "Iglesias, Raisel",
+  "pThrows": "R",
+  "pitchType": "SL",
+  "releaseSpeed": 82.8,
+  "atBatNumber": 62,
+  "pitchNumber": 1,
+  "inning": 9,
+  "homeTeam": "ATL",
+  "awayTeam": "NYM",
+  "playId": "7ccead62-6765-344d-93a4-0f2bb263198a",
+  "venueId": 4705,
+  "clipPath": "clips/824886_7ccead62-6765-344d-93a4-0f2bb263198a/clip.mp4",
+  "nFrames": 386,
+  "imgW": 1280,
+  "imgH": 720,
+  "fps": 59.56616490945909
+}

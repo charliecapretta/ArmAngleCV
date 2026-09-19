@@ -1,0 +1,22 @@
+{
+  "evalId": "eval11",
+  "gamePk": 823017,
+  "gameDate": "2026-08-12",
+  "pitcherId": 700669,
+  "pitcherName": "Graceffo, Gordon",
+  "pThrows": "R",
+  "pitchType": "SL",
+  "releaseSpeed": 85.6,
+  "atBatNumber": 62,
+  "pitchNumber": 1,
+  "inning": 8,
+  "homeTeam": "STL",
+  "awayTeam": "PHI",
+  "playId": "3e00f88d-ad68-314b-bd9b-984f1bd8aa13",
+  "venueId": 2889,
+  "clipPath": "clips/823017_3e00f88d-ad68-314b-bd9b-984f1bd8aa13/clip.mp4",
+  "nFrames": 396,
+  "imgW": 1280,
+  "imgH": 720,
+  "fps": 59.58451337642232
+}

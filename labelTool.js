@@ -4,7 +4,7 @@ const WORKSPACE = document.documentElement?.dataset.workspace === "analysis" ? "
 const ANALYSIS = WORKSPACE === "analysis";
 
 const state = {
-  pitches: [], index: 0, current: null, labels: new Map(), history: [], drafts: new Map(),
+  pitches: [], sessionFilter: "", exporting: false, index: 0, current: null, labels: new Map(), history: [], drafts: new Map(),
   frame: 0, img: null, imgCache: new Map(), points: {}, origin: {}, mode: "release",
   zoom: false, zoomView: null, drag: null, active: null, placingPoint: false, ballOccluded: false,
   loading: false, busy: false, poseBusy: false, playing: false, playToken: 0,
@@ -86,10 +86,11 @@ function stashDraft() {
   })));
 }
 function clearPrediction() { state.predictionToken++; state.predictedAngle = null; state.predictionBusy = false; el("anglePrediction").textContent = "—"; }
-function markDirty() { clearPrediction(); state.dirty = true; el("saveState").textContent = "Unsaved changes"; }
+function markDirty() { clearPrediction(); state.dirty = true; el("saveState").textContent = "Unsaved changes"; el("exportStatus").textContent = ""; }
 function visiblePitches() {
   return state.pitches.filter(p => {
     const row = state.labels.get(keyOf(p)), filter = el("queueFilter").value;
+    if (ANALYSIS && state.sessionFilter && p.sessionId !== state.sessionFilter) return false;
     if (filter === "batch") return p.uiTestBatch;
     if (filter === "local") return p.isLocal;
     if (filter === "release") return !row;
@@ -111,15 +112,22 @@ function renderQueue() {
 }
 function renderWorkflow() {
   const points = state.mode === "points", review = points && state.reviewing, locked = blocked();
+  const savedReview = ANALYSIS && review && !state.dirty && isComplete(state.labels.get(keyOf(state.current || {})));
   el("releaseStep").className = !points ? "active" : "done";
   el("pointsStep").className = review ? "done" : points ? "active" : "";
   el("reviewStep").className = review ? "active" : "";
-  el("stepNumber").textContent = `STEP ${review ? 3 : points ? 2 : 1} OF 3`;
+  el("stepNumber").textContent = ANALYSIS ? `STEP ${review ? 4 : points ? 3 : 2} OF 5` : `STEP ${review ? 3 : points ? 2 : 1} OF 3`;
+  if (ANALYSIS) {
+    el("releaseStep").textContent = "2 Release"; el("pointsStep").textContent = "3 Points"; el("reviewStep").textContent = "4 Review";
+    el("exportStep").className = savedReview ? "active" : "";
+    if (savedReview) { el("reviewStep").className = "done"; el("stepNumber").textContent = "STEP 5 OF 5"; }
+  }
   el("stepTitle").textContent = review ? (ANALYSIS ? "Your angle estimate" : "Review & save") : points ? "Mark five points" : "Choose the release";
   el("stepHelp").textContent = review
     ? (ANALYSIS ? "Review the estimate and your marked frame. Save when you’re ready." : "Check the points on the image, then save this pitch to the training dataset.")
     : points ? "Click each point on the image. Drag any point to adjust it, or select its name to place it again."
     : "Use the timeline and neighboring frames to choose the closest available release. An exact, clean frame is not required.";
+  if (savedReview) { el("stepTitle").textContent = "Pitch saved"; el("stepHelp").textContent = "Export this session as CSV, or add another pitch from this video."; }
   el("releaseActions").hidden = points; el("pointActions").hidden = !points || review;
   el("pointButtons").hidden = !points || review; el("occludedLabel").hidden = !points || review;
   el("reviewActions").hidden = !review;
@@ -142,7 +150,8 @@ function renderWorkflow() {
   el("playSpeed").disabled = locked || points;
   el("playPause").textContent = state.playing ? "Pause" : "Play";
   el("undoSave").disabled = locked || !state.history.length;
-  el("newLocalPitch").hidden = !ANALYSIS || !state.current?.isLocal || !review;
+  el("newLocalPitch").hidden = !ANALYSIS || !state.current?.isLocal;
+  el("newLocalPitch").disabled = locked || state.dirty || !state.labels.has(keyOf(state.current || {}));
   el("truthDetails").hidden = ANALYSIS || !review;
   if (ANALYSIS || !review) { el("sanityWarn").hidden = true; el("pDelta").textContent = "—"; }
   el("resultCard").hidden = !ANALYSIS;
@@ -150,7 +159,12 @@ function renderWorkflow() {
   el("savePoints").textContent = ANALYSIS ? "Save analysis" : "Save & next pitch →";
   if (ANALYSIS && review && !state.ballOccluded && (state.predictionBusy || state.predictedAngle == null)) el("savePoints").disabled = true;
   el("predictAngle").disabled = locked || state.poseBusy || state.predictionBusy || !points || state.ballOccluded || !POINTS.every(n => state.points[n]);
-  el("downloadResult").disabled = state.predictedAngle == null;
+  el("downloadResult").disabled = !canExportSession();
+  el("exportSession").disabled = !canExportSession();
+  el("csvFallback").hidden = !canExportSession() || el("csvFallback").dataset?.session !== selectedSessionId();
+  el("sessionSelect").disabled = locked;
+  el("closeImport").disabled = state.busy;
+  for (const button of el("sessionPitches").children) button.disabled = locked;
   if (state.current) {
     el("downloadRelease").href = frameUrl(state.frame) + "&download=1";
     const time = timeAt(state.frame);
@@ -165,7 +179,7 @@ function renderReview() {
   const time = timeAt(state.frame);
   const measured = state.ballOccluded ? null : pixelAngle("ball");
   el("reviewBallAngle").textContent = measured == null ? "Unavailable" : `${measured.toFixed(1)}°`;
-  el("reviewBallNote").textContent = measured == null ? "Mark the ball to measure this angle." : "From your marked points, relative to horizontal in this image.";
+  el("reviewBallNote").textContent = measured == null ? "Mark the ball to measure this angle." : "From your marked points, relative to image horizontal. Camera perspective affects this measurement.";
   el("reviewSummary").replaceChildren();
   for (const [label,value] of [["Release",time == null ? `Frame ${state.frame}` : `${time.toFixed(3)} s · frame ${state.frame}`],
       ["Points",state.ballOccluded ? "4 body points · ball hidden" : `${POINTS.filter(n => state.points[n]).length} of 5 placed`],
@@ -232,6 +246,7 @@ async function loadFrame() {
 }
 async function showPitch(index = state.index) {
   stopPlayback(); stashDraft(); state.index = index; state.viewToken++; state.poseToken++; state.poseBusy = false;
+  el("exportStatus").textContent = "";
   state.current = state.pitches[index]; state.imgCache.clear(); state.img = null;
   state.zoom = false; clearPoints(); state.dirty = false; showError();
   if (!state.current) return;
@@ -259,7 +274,7 @@ async function showPitch(index = state.index) {
     }
     renderThumbs();
     const next = state.pitches[index+1];
-    if (next) fetch(`/api/prefetch?dir=${encodeURIComponent(next.dirName)}`).catch(() => {});
+    if (next && !ANALYSIS) fetch(`/api/prefetch?dir=${encodeURIComponent(next.dirName)}`).catch(() => {});
   } catch (error) { showError(error.message); }
   finally { state.loading = false; renderWorkflow(); }
 }
@@ -436,7 +451,7 @@ async function addLocalVideo(payload) {
   stopPlayback(); state.busy = true; renderWorkflow(); el("importSubmit").disabled = true;
   try {
     const data = await request("/api/import", payload);
-    state.pitches.push(data.pitch); el("queueFilter").value = "local";
+    state.pitches.push(data.pitch); state.sessionFilter = data.pitch.sessionId || ""; el("queueFilter").value = "local";
     el("importPanel").hidden = true; state.busy = false;
     await showPitch(state.pitches.length-1);
   } catch (error) { el("importError").textContent = error.message; el("importError").hidden = false; showError(error.message); }
@@ -615,9 +630,110 @@ function renderMeta() {
 }
 
 function renderProgress() {
+  if (ANALYSIS) renderSession();
   const pitches = visiblePitches();
   const done = pitches.filter(p => isComplete(state.labels.get(keyOf(p)))).length;
-  el("progress").textContent = `${done} / ${pitches.length} ${ANALYSIS ? "saved" : "complete"}`;
+  el("progress").textContent = `${done} / ${pitches.length} complete`;
+}
+function selectedSessionId() {
+  return state.current?.sessionId || state.sessionFilter || state.pitches[0]?.sessionId || "";
+}
+function sessionHasDrafts(session) {
+  return state.pitches.some(p => p.sessionId === session &&
+    (state.drafts.has(keyOf(p)) || (p === state.current && state.dirty)));
+}
+function canExportSession() {
+  const session = selectedSessionId();
+  return !!session && !blocked() && !state.exporting && !sessionHasDrafts(session) &&
+    state.pitches.some(p => p.sessionId === session && state.labels.has(keyOf(p)));
+}
+function renderSession() {
+  const session = selectedSessionId(), pitches = state.pitches.filter(p => p.sessionId === session);
+  el("sessionPanel").hidden = !state.pitches.length;
+  el("sessionSelect").replaceChildren();
+  const sessions = new Map(state.pitches.map(p => [p.sessionId, p]));
+  for (const [id, pitch] of sessions) {
+    const option = document.createElement("option"); option.value = id;
+    option.textContent = pitch.sessionName || pitch.sourceName || "MLB example";
+    option.selected = id === session; el("sessionSelect").append(option);
+  }
+  el("sessionPitches").replaceChildren();
+  for (const [index, pitch] of pitches.entries()) {
+    const row = state.labels.get(keyOf(pitch)), button = document.createElement("button");
+    const status = {labeled:"Labeled", occluded:"Ball unavailable", release_selected:"Release saved · needs points", skipped:"Skipped"}[row?.status] || "Needs release";
+    button.className = `secondary${pitch === state.current ? " selectedPitch" : ""}`;
+    button.textContent = `Pitch ${index+1} · ${status}${hasValue(row?.frame_index) ? ` · frame ${row.frame_index}` : ""}`;
+    button.disabled = blocked();
+    button.addEventListener("click", () => { if (!blocked()) showPitch(state.pitches.indexOf(pitch)); });
+    el("sessionPitches").append(button);
+  }
+  const saved = pitches.filter(p => state.labels.has(keyOf(p))).length;
+  el("sessionSummary").textContent = `${saved} saved / ${pitches.length} pitches · ${pitches[0]?.sourceName || "MLB example"}`;
+  el("exportSession").disabled = !canExportSession();
+}
+async function exportSession() {
+  if (!canExportSession()) {
+    el("exportStatus").textContent = "Save your edits or a release frame before exporting this session."; return;
+  }
+  const session = selectedSessionId();
+  state.exporting = true; renderWorkflow(); el("exportStatus").textContent = "Preparing CSV from saved points…";
+  try {
+    const response = await fetch(`/api/export?session=${encodeURIComponent(session)}`);
+    if (!response.ok) { const error = await response.json(); throw new Error(error.error || "Export failed."); }
+    // A normal HTTP attachment also works in browsers that don't download blob URLs.
+    await response.text();
+    el("csvFallback").href = `/api/export?session=${encodeURIComponent(session)}`;
+    el("csvFallback").dataset.session = session;
+    el("csvFallback").hidden = false;
+    el("csvFallback").click();
+    el("exportStatus").textContent = "CSV ready. If the download did not start, use Download CSV directly. Unfinished pitches have blank predictions.";
+  } catch (error) { el("exportStatus").textContent = `Export failed: ${error.message}`; }
+  finally { state.exporting = false; renderWorkflow(); }
+}
+function sendVideo(file, metadata) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `/api/upload?${new URLSearchParams(metadata)}`);
+    xhr.setRequestHeader("Content-Type", "video/mp4"); xhr.timeout = 180000;
+    xhr.upload.onprogress = event => {
+      if (event.lengthComputable) el("uploadProgress").value = event.loaded / event.total * 100;
+      el("uploadStatus").textContent = `Uploading… ${Math.round(el("uploadProgress").value)}%`;
+    };
+    xhr.upload.onload = () => { el("uploadProgress").removeAttribute("value"); el("uploadStatus").textContent = "Checking video frames…"; };
+    xhr.onload = () => {
+      try {
+        const data = JSON.parse(xhr.responseText);
+        if (xhr.status < 200 || xhr.status >= 300 || !data.ok) throw new Error(data.error || "Upload failed.");
+        resolve(data);
+      } catch (error) { reject(error); }
+    };
+    xhr.onerror = () => reject(new Error("Connection lost. Try the upload again."));
+    xhr.ontimeout = () => reject(new Error("Upload timed out. Try a shorter clip."));
+    xhr.send(file);
+  });
+}
+async function uploadVideo() {
+  if (blocked()) return;
+  const file = el("videoFile").files?.[0];
+  if (!file || !/\.mp4$/i.test(file.name) || file.size <= 0 || file.size > 100 * 1024 * 1024) {
+    el("importError").textContent = "Choose an MP4 video no larger than 100 MB."; el("importError").hidden = false; return;
+  }
+  stopPlayback(); stashDraft(); state.busy = true; renderWorkflow();
+  el("importSubmit").disabled = true; el("uploadProgress").hidden = false; el("uploadProgress").value = 0;
+  el("importError").hidden = true; el("uploadStatus").textContent = "Starting upload…";
+  try {
+    const data = await sendVideo(file, {filename:file.name, sessionName:el("importSession").value.trim(),
+      pitcherName:el("importPitcher").value.trim(), pThrows:el("importThrows").value});
+    state.pitches.push(data.pitch); state.sessionFilter = data.pitch.sessionId;
+    el("queueFilter").value = "local"; el("importPanel").hidden = true;
+    el("uploadStatus").textContent = "Upload ready."; el("videoFile").value = "";
+    state.busy = false; await showPitch(state.pitches.length-1);
+  } catch (error) {
+    el("importError").textContent = error.message; el("importError").hidden = false;
+    el("uploadStatus").textContent = "Upload not completed.";
+  } finally {
+    state.busy = false; el("importSubmit").disabled = false; el("uploadProgress").hidden = true; renderWorkflow();
+  }
 }
 function renderHistogram() {
   const bins = new Array(12).fill(0), lo = -70, hi = 90;
@@ -720,20 +836,21 @@ el("pitchSelect").addEventListener("change", event => {
   if (!blocked()) showPitch(state.pitches.findIndex(p => keyOf(p) === event.target.value));
 });
 el("queueFilter").addEventListener("change", () => {
+  state.sessionFilter = "";
   const pitches = visiblePitches();
   if (pitches.length && !pitches.includes(state.current)) showPitch(state.pitches.indexOf(pitches[0]));
   else { renderQueue(); renderProgress(); if (!pitches.length) toast("No pitches in this queue."); }
 });
-el("openImport").addEventListener("click", () => { stopPlayback(); el("importPanel").hidden = false; el("videoPath").focus(); });
+el("openImport").addEventListener("click", () => { stopPlayback(); el("importPanel").hidden = false; el("videoFile").focus(); });
 el("closeImport").addEventListener("click", () => { el("importPanel").hidden = true; });
 el("importPanel").addEventListener("submit", event => {
   event.preventDefault(); el("importError").hidden = true;
-  addLocalVideo({path:el("videoPath").value.trim(), pitcherName:el("importPitcher").value.trim(), park:el("importPark").value.trim(), pThrows:el("importThrows").value});
+  uploadVideo();
 });
 el("newLocalPitch").addEventListener("click", () => {
   const p = state.current;
   if (state.dirty) { showError("Save the release or point labels before adding another pitch from this video."); return; }
-  addLocalVideo({path:p.sourcePath, pitcherName:p.pitcherName, park:p.park, pThrows:p.pThrows, startFrame:Math.min(state.frame+1,p.nFrames-1)});
+  addLocalVideo({parentId:p.playId, startFrame:Math.min(state.frame+1,p.nFrames-1)});
 });
 document.addEventListener("keydown", event => {
   if (el("app").hidden || ["INPUT","SELECT","TEXTAREA"].includes(event.target.tagName)) return;
@@ -770,7 +887,7 @@ function configureWorkspace() {
   el("workspaceBadge").textContent = ANALYSIS ? "YOUR FOOTAGE" : "DATASET WORKSPACE";
   el("workspaceEyebrow").textContent = ANALYSIS ? "UNDERSTAND YOUR DELIVERY" : "BUILD THE DATASET";
   el("workspaceTitle").textContent = ANALYSIS ? "Pitch analysis" : "Training labeler";
-  el("workspaceDescription").textContent = ANALYSIS ? "Open footage, mark the release and five points, then review your estimate." : "One pitch at a time. Choose the release, mark the points, then review and save.";
+  el("workspaceDescription").textContent = ANALYSIS ? "Upload → lock release → mark five points → save → export CSV." : "One pitch at a time. Choose the release, mark the points, then review and save.";
   const options = ANALYSIS ? [["local","My footage"],["batch","MLB examples"],["all","All available clips"]]
     : [["batch","New MLB trial batch"],["release","Need release"],["points","Need points"],["all","All MLB pitches"]];
   el("queueFilter").replaceChildren();
@@ -783,12 +900,13 @@ el("reviewPoints").addEventListener("click", goReview);
 el("editPoints").addEventListener("click", editPoints);
 el("startVideo").addEventListener("click", () => el("openImport").click());
 el("startLocal").addEventListener("click", () => { el("queueFilter").value = "local"; const p = state.pitches.find(p => p.isLocal); if (p) showPitch(state.pitches.indexOf(p)); });
-el("startExample").addEventListener("click", () => { el("queueFilter").value = "batch"; const p = state.pitches.find(p => p.uiTestBatch); if (p) showPitch(state.pitches.indexOf(p)); });
-el("downloadResult").addEventListener("click", () => {
-  if (state.predictedAngle == null) return;
-  const p = state.current;
-  const text = `Arm Angle — pitch analysis\nPitcher: ${p.pitcherName || "Not specified"}\nVideo: ${p.sourceName || "MLB example"}\nRelease: ${timeAt(state.frame)?.toFixed(3)} s (frame ${state.frame})\nEstimated arm angle: ${state.predictedAngle.toFixed(1)}°\nRelease choice: ${state.releaseQuality}\nPoint clarity: ${state.pointQuality}\n\nMLB-trained estimate. Accuracy on college footage is unverified.\n`;
-  const url = URL.createObjectURL(new Blob([text],{type:"text/plain"}));const a = document.createElement("a");a.href = url;a.download = `pitch-${state.frame}-analysis.txt`;a.click();setTimeout(() => URL.revokeObjectURL(url),1000);
+el("startExample").addEventListener("click", () => { state.sessionFilter = ""; el("queueFilter").value = "batch"; const p = state.pitches.find(p => p.uiTestBatch); if (p) showPitch(state.pitches.indexOf(p)); });
+el("downloadResult").addEventListener("click", exportSession);
+el("exportSession").addEventListener("click", exportSession);
+el("sessionSelect").addEventListener("change", async event => {
+  state.sessionFilter = event.target.value;
+  const pitch = state.pitches.find(p => p.sessionId === state.sessionFilter);
+  if (pitch) { el("queueFilter").value = pitch.isLocal ? "local" : "batch"; await showPitch(state.pitches.indexOf(pitch)); }
 });
 async function boot() {
   configureWorkspace();

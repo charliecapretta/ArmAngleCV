@@ -1,0 +1,22 @@
+{
+  "evalId": "eval20",
+  "gamePk": 823347,
+  "gameDate": "2026-08-15",
+  "pitcherId": 683003,
+  "pitcherName": "Jones, Jared",
+  "pThrows": "R",
+  "pitchType": "CH",
+  "releaseSpeed": 91.8,
+  "atBatNumber": 25,
+  "pitchNumber": 1,
+  "inning": 4,
+  "homeTeam": "PIT",
+  "awayTeam": "BOS",
+  "playId": "456b040c-5cab-327e-aa66-29c981fb89b0",
+  "venueId": 31,
+  "clipPath": "clips/823347_456b040c-5cab-327e-aa66-29c981fb89b0/clip.mp4",
+  "nFrames": 432,
+  "imgW": 1280,
+  "imgH": 720,
+  "fps": 59.641049240681085
+}

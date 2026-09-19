@@ -1,0 +1,242 @@
+[
+  {
+    "evalId": "eval01",
+    "offset": -2,
+    "dAngle": 13.942,
+    "maxPointShift": 34.37659669019031
+  },
+  {
+    "evalId": "eval01",
+    "offset": -1,
+    "dAngle": 58.349999999999994,
+    "maxPointShift": 23.09601697262975
+  },
+  {
+    "evalId": "eval01",
+    "offset": 1,
+    "dAngle": 4.961,
+    "maxPointShift": 8.25193916603842
+  },
+  {
+    "evalId": "eval01",
+    "offset": 2,
+    "dAngle": 14.461000000000002,
+    "maxPointShift": 55.169981874204005
+  },
+  {
+    "evalId": "eval02",
+    "offset": -2,
+    "dAngle": 20.263999999999996,
+    "maxPointShift": 11.541230437002787
+  },
+  {
+    "evalId": "eval02",
+    "offset": -1,
+    "dAngle": 11.768,
+    "maxPointShift": 12.35607138211817
+  },
+  {
+    "evalId": "eval02",
+    "offset": 1,
+    "dAngle": 7.339000000000006,
+    "maxPointShift": 17.930769643269674
+  },
+  {
+    "evalId": "eval02",
+    "offset": 2,
+    "dAngle": 40.161,
+    "maxPointShift": 33.42756945995326
+  },
+  {
+    "evalId": "eval03",
+    "offset": -2,
+    "dAngle": 28.411,
+    "maxPointShift": 64.28069694706178
+  },
+  {
+    "evalId": "eval03",
+    "offset": -1,
+    "dAngle": 35.119,
+    "maxPointShift": 60.89358751132997
+  },
+  {
+    "evalId": "eval03",
+    "offset": 1,
+    "dAngle": 9.027000000000001,
+    "maxPointShift": 24.747015981730033
+  },
+  {
+    "evalId": "eval03",
+    "offset": 2,
+    "dAngle": 11.996000000000002,
+    "maxPointShift": 17.901745724928617
+  },
+  {
+    "evalId": "eval04",
+    "offset": -2,
+    "dAngle": 37.935,
+    "maxPointShift": 48.07425090420022
+  },
+  {
+    "evalId": "eval04",
+    "offset": -1,
+    "dAngle": 7.955999999999996,
+    "maxPointShift": 26.82255207842829
+  },
+  {
+    "evalId": "eval04",
+    "offset": 1,
+    "dAngle": 12.813000000000002,
+    "maxPointShift": 28.523528884063357
+  },
+  {
+    "evalId": "eval04",
+    "offset": 2,
+    "dAngle": 85.763,
+    "maxPointShift": 44.87619413452973
+  },
+  {
+    "evalId": "eval05",
+    "offset": -2,
+    "dAngle": 21.962,
+    "maxPointShift": 66.91002690180298
+  },
+  {
+    "evalId": "eval05",
+    "offset": -1,
+    "dAngle": 14.936,
+    "maxPointShift": 62.29338648684948
+  },
+  {
+    "evalId": "eval05",
+    "offset": 1,
+    "dAngle": 1.6299999999999955,
+    "maxPointShift": 3.498028015896981
+  },
+  {
+    "evalId": "eval05",
+    "offset": 2,
+    "dAngle": 18.087999999999997,
+    "maxPointShift": 50.51275977414023
+  },
+  {
+    "evalId": "eval06",
+    "offset": -2,
+    "dAngle": 31.183999999999997,
+    "maxPointShift": 14.361197721638687
+  },
+  {
+    "evalId": "eval06",
+    "offset": -1,
+    "dAngle": 14.619999999999997,
+    "maxPointShift": 9.086148799133792
+  },
+  {
+    "evalId": "eval06",
+    "offset": 1,
+    "dAngle": 8.603000000000002,
+    "maxPointShift": 11.764034172000684
+  },
+  {
+    "evalId": "eval06",
+    "offset": 2,
+    "dAngle": 9.21,
+    "maxPointShift": 9.100065933827077
+  },
+  {
+    "evalId": "eval07",
+    "offset": -2,
+    "dAngle": 4.345000000000001,
+    "maxPointShift": 6.998892769574352
+  },
+  {
+    "evalId": "eval07",
+    "offset": -1,
+    "dAngle": 1.056,
+    "maxPointShift": 5.617116698093458
+  },
+  {
+    "evalId": "eval07",
+    "offset": 1,
+    "dAngle": 9.309000000000001,
+    "maxPointShift": 5.834123755972271
+  },
+  {
+    "evalId": "eval07",
+    "offset": 2,
+    "dAngle": 31.093000000000004,
+    "maxPointShift": 40.65008241074057
+  },
+  {
+    "evalId": "eval08",
+    "offset": -2,
+    "dAngle": 12.875,
+    "maxPointShift": 31.280575442277275
+  },
+  {
+    "evalId": "eval08",
+    "offset": -1,
+    "dAngle": 4.341000000000001,
+    "maxPointShift": 31.243946613704207
+  },
+  {
+    "evalId": "eval08",
+    "offset": 1,
+    "dAngle": 6.9090000000000025,
+    "maxPointShift": 18.690757074019245
+  },
+  {
+    "evalId": "eval08",
+    "offset": 2,
+    "dAngle": 107.041,
+    "maxPointShift": 124.33937107770814
+  },
+  {
+    "evalId": "eval09",
+    "offset": -2,
+    "dAngle": 4.149999999999999,
+    "maxPointShift": 6.796123895280262
+  },
+  {
+    "evalId": "eval09",
+    "offset": -1,
+    "dAngle": 14.758,
+    "maxPointShift": 8.958627126965375
+  },
+  {
+    "evalId": "eval09",
+    "offset": 1,
+    "dAngle": 6.306999999999999,
+    "maxPointShift": 10.272623812833842
+  },
+  {
+    "evalId": "eval09",
+    "offset": 2,
+    "dAngle": 119.101,
+    "maxPointShift": 75.73771649581202
+  },
+  {
+    "evalId": "eval10",
+    "offset": -2,
+    "dAngle": 6.730999999999998,
+    "maxPointShift": 9.616527439777835
+  },
+  {
+    "evalId": "eval10",
+    "offset": -1,
+    "dAngle": 5.623999999999999,
+    "maxPointShift": 9.906669470614208
+  },
+  {
+    "evalId": "eval10",
+    "offset": 1,
+    "dAngle": 29.406,
+    "maxPointShift": 69.28096997011524
+  },
+  {
+    "evalId": "eval10",
+    "offset": 2,
+    "dAngle": 102.399,
+    "maxPointShift": 135.44565847601024
+  }
+]

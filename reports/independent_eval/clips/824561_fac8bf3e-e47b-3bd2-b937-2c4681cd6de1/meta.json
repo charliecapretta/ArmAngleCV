@@ -1,0 +1,22 @@
+{
+  "evalId": "eval29",
+  "gamePk": 824561,
+  "gameDate": "2026-08-13",
+  "pitcherId": 682825,
+  "pitcherName": "Mey, Luis",
+  "pThrows": "R",
+  "pitchType": "SL",
+  "releaseSpeed": 83.0,
+  "atBatNumber": 68,
+  "pitchNumber": 2,
+  "inning": 7,
+  "homeTeam": "CWS",
+  "awayTeam": "CIN",
+  "playId": "fac8bf3e-e47b-3bd2-b937-2c4681cd6de1",
+  "venueId": 4,
+  "clipPath": "clips/824561_fac8bf3e-e47b-3bd2-b937-2c4681cd6de1/clip.mp4",
+  "nFrames": 688,
+  "imgW": 1280,
+  "imgH": 720,
+  "fps": 59.73507033244998
+}

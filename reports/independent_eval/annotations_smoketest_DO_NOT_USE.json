@@ -1,0 +1,47 @@
+{
+  "_warning": "Three throwaway annotations used only to smoke-test scoreEval.py. Claude's clicks; NOT valid data. See report.md section 2.",
+  "records": [
+    {
+      "evalId": "eval01",
+      "frameIndex": 179,
+      "shoulder_x": 530,
+      "shoulder_y": 416,
+      "off_shoulder_x": 478,
+      "off_shoulder_y": 431,
+      "elbow_x": 559,
+      "elbow_y": 423,
+      "wrist_x": 590,
+      "wrist_y": 396,
+      "ball_x": 604,
+      "ball_y": 390
+    },
+    {
+      "evalId": "eval02",
+      "frameIndex": 181,
+      "shoulder_x": 430,
+      "shoulder_y": 405,
+      "off_shoulder_x": 389,
+      "off_shoulder_y": 422,
+      "elbow_x": 461,
+      "elbow_y": 391,
+      "wrist_x": 465,
+      "wrist_y": 362,
+      "ball_x": 472,
+      "ball_y": 353
+    },
+    {
+      "evalId": "eval03",
+      "frameIndex": 172,
+      "shoulder_x": 522,
+      "shoulder_y": 337,
+      "off_shoulder_x": 466,
+      "off_shoulder_y": 359,
+      "elbow_x": 571,
+      "elbow_y": 314,
+      "wrist_x": 596,
+      "wrist_y": 300,
+      "ball_x": 611,
+      "ball_y": 295
+    }
+  ]
+}

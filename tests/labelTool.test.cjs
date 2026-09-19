@@ -7,8 +7,9 @@ const source = fs.readFileSync(path.join(__dirname,'../labelTool.js'),'utf8').re
 function harness(workspace='training') {
   const elements = new Map();
   class Element {
-    constructor(tag='DIV') { this.tagName=tag; this.value='all'; this.width=1280; this.height=720; this.hidden=false; this.children=[]; this.classList={add(){},remove(){}}; }
+    constructor(tag='DIV') { this.tagName=tag; this.dataset={}; this.value='all'; this.width=1280; this.height=720; this.hidden=false; this.children=[]; this.classList={add(){},remove(){}}; }
     addEventListener() {} replaceChildren(...x) { this.children=x; } append(...x) { this.children.push(...x); }
+    click() { this.clicked=true; }
     getContext() { return new Proxy({}, {get:()=>()=>{}}); } focus() {}
   }
   const context = vm.createContext({console,Map,Math,Number,JSON,Error,Promise,performance,
@@ -108,4 +109,54 @@ test('analysis requests use their own workspace and review calculates the estima
  assert.equal(run(`el('savePoints').disabled`),false);
  run('markDirty()');await run('saveCurrent()');
  assert.equal(requests.length,2);
+});
+
+test('session export blocks unsaved edits, including another pitch draft',()=>{
+ const {run}=harness('analysis');
+ run(`state.pitches.forEach(p=>p.sessionId='s1');state.labels.set('1_a',{status:'release_selected'});`);
+ assert.equal(run('canExportSession()'),true);
+ run('markDirty()');assert.equal(run('canExportSession()'),false);
+ run(`state.dirty=false;state.drafts.set('1_b',{dirty:true});`);
+ assert.equal(run('canExportSession()'),false);
+ run(`state.pitches[1].sessionId='s2'`);assert.equal(run('canExportSession()'),true);
+});
+test('session list includes unfinished pitches and filters the queue',()=>{
+ const {run}=harness('analysis');
+ run(`state.pitches[0].sessionId='s1';state.pitches[1].sessionId='s2';state.sessionFilter='s1';state.labels.set('1_a',{status:'release_selected',frame_index:2});renderSession()`);
+ assert.equal(run('visiblePitches().length'),1);
+ assert.equal(run(`el('sessionPitches').children.length`),1);
+ assert.match(run(`el('sessionPitches').children[0].textContent`),/needs points/);
+});
+test('upload handles failure without losing existing annotations or leaving controls busy',async()=>{
+ const {run}=harness('analysis');
+ run(`el('videoFile').files=[{name:'test.mp4',size:100}];state.labels.set('1_a',{status:'release_selected'});sendVideo=async()=>{throw new Error('Cannot decode this MP4')};`);
+ await run('uploadVideo()');
+ assert.equal(run('state.pitches.length'),2);
+ assert.equal(run('state.labels.size'),1);
+ assert.equal(run('state.busy'),false);
+ assert.match(run(`el('importError').textContent`),/Cannot decode/);
+});
+test('successful upload opens its named session and retains the previous draft',async()=>{
+ const {run}=harness('analysis');
+ run(`el('videoFile').files=[{name:'test.mp4',size:100}];state.dirty=true;sendVideo=async()=>({ok:true,pitch:{gamePk:'local',playId:'new',dirName:'local_new',isLocal:true,sessionId:'new-session',sessionName:'Bullpen',nFrames:10,fps:30,imgW:1280,imgH:720,frameTimes:Array.from({length:10},(_,i)=>i/30)}});`);
+ await run('uploadVideo()');
+ assert.equal(run('state.current.playId'),'new');
+ assert.equal(run('state.sessionFilter'),'new-session');
+ assert.equal(run(`state.drafts.has('1_a')`),true);
+ assert.equal(run('state.busy'),false);
+ assert.equal(run(`el('importPanel').hidden`),true);
+});
+
+test('export downloads a server attachment and offers a direct retry link',async()=>{
+ const {run,context}=harness('analysis');const urls=[];
+ run(`state.pitches.forEach(p=>p.sessionId='s1');state.labels.set('1_a',{status:'release_selected'});`);
+ context.fetch=async url=>{urls.push(url);return {ok:true,text:async()=> 'session_id,status\\ns1,release_selected'}};
+ await run('exportSession()');
+ assert.deepEqual(urls,['/api/export?session=s1']);
+ assert.equal(run(`el('csvFallback').href`),'/api/export?session=s1');
+ assert.equal(run(`el('csvFallback').clicked`),true);
+ assert.equal(run(`el('csvFallback').hidden`),false);
+ run('markDirty();renderWorkflow()');
+ assert.equal(run(`el('csvFallback').hidden`),true);
+ assert.equal(run(`el('exportStatus').textContent`),'');
 });

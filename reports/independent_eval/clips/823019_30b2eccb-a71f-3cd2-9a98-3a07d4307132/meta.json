@@ -1,0 +1,22 @@
+{
+  "evalId": "eval14",
+  "gamePk": 823019,
+  "gameDate": "2026-08-11",
+  "pitcherId": 686934,
+  "pitcherName": "McFarlane, Alex",
+  "pThrows": "R",
+  "pitchType": "ST",
+  "releaseSpeed": 86.8,
+  "atBatNumber": 51,
+  "pitchNumber": 1,
+  "inning": 7,
+  "homeTeam": "STL",
+  "awayTeam": "PHI",
+  "playId": "30b2eccb-a71f-3cd2-9a98-3a07d4307132",
+  "venueId": 2889,
+  "clipPath": "clips/823019_30b2eccb-a71f-3cd2-9a98-3a07d4307132/clip.mp4",
+  "nFrames": 462,
+  "imgW": 1280,
+  "imgH": 720,
+  "fps": 59.631198676009554
+}

@@ -1,0 +1,22 @@
+{
+  "evalId": "eval06",
+  "gamePk": 824884,
+  "gameDate": "2026-08-15",
+  "pitcherId": 608718,
+  "pitcherName": "Suter, Brent",
+  "pThrows": "L",
+  "pitchType": "SI",
+  "releaseSpeed": 89.3,
+  "atBatNumber": 50,
+  "pitchNumber": 2,
+  "inning": 6,
+  "homeTeam": "ATL",
+  "awayTeam": "AZ",
+  "playId": "ffcb1c15-9c74-3da2-91a7-405a2b417a5b",
+  "venueId": 4705,
+  "clipPath": "clips/824884_ffcb1c15-9c74-3da2-91a7-405a2b417a5b/clip.mp4",
+  "nFrames": 370,
+  "imgW": 1280,
+  "imgH": 720,
+  "fps": 59.54307396036541
+}

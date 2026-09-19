@@ -1,0 +1,64 @@
+LOPO Ridge RMSE 2.662
+labeled pitchers with season mean: 94 / 103
+season Statcast within-pitcher SD, pooled over pitchers with >=10 pitches: 3.54 deg
+
+[Ridge LOPO] error vs pitcher season Statcast angle
+  overall bias -0.29  within-pitcher SD 3.67  between-pitcher bias SD 2.19  (pitchers with >=2: 25)
+  pitchers within 1 deg of season mean after ONE pitch: 17% of pitches
+  simulated new pitcher, P(|mean of n preds - season angle| < 1 deg):
+    n=  1:  18.5%   noise-only SE 3.67 deg
+    n=  2:  23.2%   noise-only SE 2.59 deg
+    n=  3:  25.9%   noise-only SE 2.12 deg
+    n=  5:  28.6%   noise-only SE 1.64 deg
+    n=  8:  30.6%   noise-only SE 1.30 deg
+    n= 10:  31.3%   noise-only SE 1.16 deg
+    n= 15:  32.5%   noise-only SE 0.95 deg
+    n= 20:  33.1%   noise-only SE 0.82 deg
+    n= 30:  33.8%   noise-only SE 0.67 deg
+    n= 50:  34.3%   noise-only SE 0.52 deg
+    n=100:  34.7%   noise-only SE 0.37 deg
+
+[raw hand ball_angle] error vs pitcher season Statcast angle
+  overall bias +0.89  within-pitcher SD 3.93  between-pitcher bias SD 1.97  (pitchers with >=2: 25)
+  pitchers within 1 deg of season mean after ONE pitch: 12% of pitches
+  simulated new pitcher, P(|mean of n preds - season angle| < 1 deg):
+    n=  1:  17.9%   noise-only SE 3.93 deg
+    n=  2:  23.1%   noise-only SE 2.78 deg
+    n=  3:  26.0%   noise-only SE 2.27 deg
+    n=  5:  29.7%   noise-only SE 1.76 deg
+    n=  8:  32.1%   noise-only SE 1.39 deg
+    n= 10:  33.4%   noise-only SE 1.24 deg
+    n= 15:  34.7%   noise-only SE 1.01 deg
+    n= 20:  36.0%   noise-only SE 0.88 deg
+    n= 30:  36.8%   noise-only SE 0.72 deg
+    n= 50:  37.5%   noise-only SE 0.56 deg
+    n=100:  38.3%   noise-only SE 0.39 deg
+
+=== empirical running mean, pitchers with >=5 labels (1000 random orderings) ===
+
+[pred]  median |running mean - season angle| by n  (first-n that stays <1 deg thereafter)
+  Herget, Jimmy      n= 7 season   +2.8 finalmean   +4.0 bias  +1.2 sd  7.3 |  4.4  4.2  3.1  1.6  0.7  0.9  1.2 | stabilizes n=never (0% of orderings)
+  Rogers, Tyler      n=13 season  -61.4 finalmean  -59.2 bias  +2.3 sd  1.6 |  2.4  2.2  2.3  2.4  2.3  2.3  2.3  2.3  2.3  2.3 | stabilizes n=never (0% of orderings)
+  Thompson, Ryan     n=10 season  -12.2 finalmean  -13.1 bias  -0.9 sd  4.0 |  2.5  1.6  1.3  1.3  1.2  0.9  1.0  1.0  0.7  0.9 | stabilizes n=9 (100% of orderings)
+  Hill, Tim          n=14 season  -23.4 finalmean  -24.7 bias  -1.3 sd  2.4 |  2.0  1.3  1.3  1.3  1.3  1.3  1.3  1.3  1.3  1.2 | stabilizes n=never (0% of orderings)
+  Anderson, Grant    n= 5 season   +6.8 finalmean   +7.7 bias  +0.9 sd  7.7 |  6.4  2.4  2.9  1.7  0.9 | stabilizes n=5 (100% of orderings)
+  Kelly, Kevin       n= 6 season   -0.2 finalmean   +2.2 bias  +2.5 sd  3.7 |  2.2  2.0  2.2  2.7  2.6  2.5 | stabilizes n=never (0% of orderings)
+  Lee, Chase         n= 6 season   -4.5 finalmean   -7.0 bias  -2.5 sd  1.9 |  3.8  2.6  2.3  2.5  2.3  2.5 | stabilizes n=never (0% of orderings)
+
+[ball_angle]  median |running mean - season angle| by n  (first-n that stays <1 deg thereafter)
+  Herget, Jimmy      n= 7 season   +2.8 finalmean   +5.4 bias  +2.6 sd  6.4 |  4.6  4.4  3.9  1.7  2.1  2.3  2.6 | stabilizes n=never (0% of orderings)
+  Rogers, Tyler      n=13 season  -61.4 finalmean  -55.8 bias  +5.7 sd  1.7 |  5.6  5.6  5.7  5.7  5.7  5.7  5.7  5.7  5.6  5.7 | stabilizes n=never (0% of orderings)
+  Thompson, Ryan     n=10 season  -12.2 finalmean  -12.1 bias  +0.1 sd  4.2 |  3.2  1.8  1.4  1.1  1.0  0.8  0.6  0.5  0.3  0.1 | stabilizes n=7 (100% of orderings)
+  Hill, Tim          n=14 season  -23.4 finalmean  -23.7 bias  -0.3 sd  3.3 |  2.9  1.5  1.3  1.1  0.9  0.8  0.7  0.6  0.5  0.4 | stabilizes n=7 (100% of orderings)
+  Anderson, Grant    n= 5 season   +6.8 finalmean   +9.2 bias  +2.4 sd  8.8 |  6.5  3.2  2.8  2.0  2.4 | stabilizes n=never (0% of orderings)
+  Kelly, Kevin       n= 6 season   -0.2 finalmean   +4.2 bias  +4.5 sd  3.2 |  5.0  4.4  4.6  4.6  4.6  4.5 | stabilizes n=never (0% of orderings)
+  Lee, Chase         n= 6 season   -4.5 finalmean   -4.9 bias  -0.4 sd  3.0 |  3.3  1.2  1.1  0.6  0.7  0.4 | stabilizes n=4 (100% of orderings)
+
+=== 1% criterion: n at which adding a pitch moves the running mean < 1% of the pitcher's angle (median over orderings) ===
+  Herget, Jimmy      angle   +2.8 tol 0.03 deg  n=nan  (0% of orderings reach it within 7)
+  Rogers, Tyler      angle  -61.4 tol 0.61 deg  n=4  (100% of orderings reach it within 13)
+  Thompson, Ryan     angle  -12.2 tol 0.12 deg  n=10  (9% of orderings reach it within 10)
+  Hill, Tim          angle  -23.4 tol 0.23 deg  n=13  (86% of orderings reach it within 14)
+  Anderson, Grant    angle   +6.8 tol 0.07 deg  n=nan  (0% of orderings reach it within 5)
+  Kelly, Kevin       angle   -0.2 tol 0.00 deg  n=nan  (0% of orderings reach it within 6)
+  Lee, Chase         angle   -4.5 tol 0.04 deg  n=nan  (0% of orderings reach it within 6)

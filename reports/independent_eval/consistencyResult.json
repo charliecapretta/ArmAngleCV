@@ -1,0 +1,102 @@
+[
+  {
+    "evalId": "eval01",
+    "pitcher": "McFarlane, Alex",
+    "f1": 179,
+    "f2": 180,
+    "dFrames": 1,
+    "a1": 5.02,
+    "a2": 9.981,
+    "dAngle": 4.961
+  },
+  {
+    "evalId": "eval02",
+    "pitcher": "Estrada, Lazaro",
+    "f1": 181,
+    "f2": 182,
+    "dFrames": 1,
+    "a1": 47.185,
+    "a2": 39.846,
+    "dAngle": -7.339000000000006
+  },
+  {
+    "evalId": "eval03",
+    "pitcher": "Lugo, Seth",
+    "f1": 172,
+    "f2": 172,
+    "dFrames": 0,
+    "a1": 35.636,
+    "a2": 35.636,
+    "dAngle": 0.0
+  },
+  {
+    "evalId": "eval04",
+    "pitcher": "Ferguson, Caleb",
+    "f1": 179,
+    "f2": 181,
+    "dFrames": 2,
+    "a1": -63.35,
+    "a2": 22.413,
+    "dAngle": 85.763
+  },
+  {
+    "evalId": "eval05",
+    "pitcher": "Beeter, Clayton",
+    "f1": 179,
+    "f2": 179,
+    "dFrames": 0,
+    "a1": 48.772,
+    "a2": 48.772,
+    "dAngle": 0.0
+  },
+  {
+    "evalId": "eval06",
+    "pitcher": "Suter, Brent",
+    "f1": 179,
+    "f2": 181,
+    "dFrames": 2,
+    "a1": 33.619,
+    "a2": 42.829,
+    "dAngle": 9.21
+  },
+  {
+    "evalId": "eval07",
+    "pitcher": "Soriano, George",
+    "f1": 181,
+    "f2": 180,
+    "dFrames": -1,
+    "a1": 6.775,
+    "a2": 7.831,
+    "dAngle": 1.056
+  },
+  {
+    "evalId": "eval08",
+    "pitcher": "Alvarez, Andrew",
+    "f1": 178,
+    "f2": 177,
+    "dFrames": -1,
+    "a1": 30.719,
+    "a2": 26.378,
+    "dAngle": -4.341000000000001
+  },
+  {
+    "evalId": "eval09",
+    "pitcher": "Petersen, Michael",
+    "f1": 177,
+    "f2": 177,
+    "dFrames": 0,
+    "a1": 29.548,
+    "a2": 29.548,
+    "dAngle": 0.0
+  },
+  {
+    "evalId": "eval10",
+    "pitcher": "Hicks, Jordan",
+    "f1": 202,
+    "f2": 201,
+    "dFrames": -1,
+    "a1": 27.733,
+    "a2": 33.357,
+    "dAngle": 5.623999999999999
+  }
+]

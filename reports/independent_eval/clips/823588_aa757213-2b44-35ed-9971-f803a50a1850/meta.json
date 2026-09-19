@@ -1,0 +1,22 @@
+{
+  "evalId": "eval05",
+  "gamePk": 823588,
+  "gameDate": "2026-08-15",
+  "pitcherId": 690925,
+  "pitcherName": "Beeter, Clayton",
+  "pThrows": "R",
+  "pitchType": "SL",
+  "releaseSpeed": 86.7,
+  "atBatNumber": 62,
+  "pitchNumber": 2,
+  "inning": 8,
+  "homeTeam": "NYM",
+  "awayTeam": "WSH",
+  "playId": "aa757213-2b44-35ed-9971-f803a50a1850",
+  "venueId": 3289,
+  "clipPath": "clips/823588_aa757213-2b44-35ed-9971-f803a50a1850/clip.mp4",
+  "nFrames": 684,
+  "imgW": 1280,
+  "imgH": 720,
+  "fps": 59.7352668049104
+}

@@ -1,0 +1,22 @@
+{
+  "evalId": "eval10",
+  "gamePk": 824239,
+  "gameDate": "2026-08-15",
+  "pitcherId": 663855,
+  "pitcherName": "Hicks, Jordan",
+  "pThrows": "R",
+  "pitchType": "FS",
+  "releaseSpeed": 92.2,
+  "atBatNumber": 60,
+  "pitchNumber": 4,
+  "inning": 7,
+  "homeTeam": "DET",
+  "awayTeam": "CWS",
+  "playId": "64060783-6fd3-3fff-bf79-7a0d94e48c07",
+  "venueId": 2394,
+  "clipPath": "clips/824239_64060783-6fd3-3fff-bf79-7a0d94e48c07/clip.mp4",
+  "nFrames": 456,
+  "imgW": 1280,
+  "imgH": 720,
+  "fps": 59.61624223020527
+}

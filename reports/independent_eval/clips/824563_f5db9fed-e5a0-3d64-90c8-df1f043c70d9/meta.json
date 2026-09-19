@@ -1,0 +1,22 @@
+{
+  "evalId": "eval30",
+  "gamePk": 824563,
+  "gameDate": "2026-08-11",
+  "pitcherId": 641941,
+  "pitcherName": "Pag\u00e1n, Emilio",
+  "pThrows": "R",
+  "pitchType": "FS",
+  "releaseSpeed": 81.3,
+  "atBatNumber": 73,
+  "pitchNumber": 6,
+  "inning": 10,
+  "homeTeam": "CWS",
+  "awayTeam": "CIN",
+  "playId": "f5db9fed-e5a0-3d64-90c8-df1f043c70d9",
+  "venueId": 4,
+  "clipPath": "clips/824563_f5db9fed-e5a0-3d64-90c8-df1f043c70d9/clip.mp4",
+  "nFrames": 411,
+  "imgW": 1280,
+  "imgH": 720,
+  "fps": 59.608123721906104
+}
