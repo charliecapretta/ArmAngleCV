@@ -1,0 +1,16 @@
+[Unit]
+Description=Expire Arm Angle CV private video sessions
+
+[Service]
+Type=oneshot
+User=webapp
+Group=webapp
+WorkingDirectory=/var/app/current
+ExecStart=/usr/local/libexec/armangle-manage cleanup
+UMask=0077
+Environment=OPENBLAS_NUM_THREADS=1
+Environment=OMP_NUM_THREADS=1
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/armangle

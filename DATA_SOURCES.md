@@ -21,6 +21,12 @@ retrieves clips from their Baseball Savant pages for local use. Availability can
 change. Keep attribution with any externally sourced material and consult its
 source terms before redistribution.
 
+The hosted app can offer one practice clip to visitors, installed on the server
+with `hosted.manage example install` and never part of the public file set.
+Installing one serves that footage to everyone who opens the site, which goes
+beyond the local research use the downloader is meant for. Confirm redistribution
+is permitted before installing a clip, and `example remove` withdraws it.
+
 Personal videos, their registrations, and their prediction reports are excluded
 from the public release. The application reads user-selected files locally.
 

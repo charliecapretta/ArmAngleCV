@@ -7,3 +7,9 @@
 
 /* Manual V1 session controls. */
 .sessionPanel{margin:0 30px 20px;padding:18px;background:var(--panel);border:1px solid var(--line);border-radius:12px}.sessionHeader{display:flex;align-items:end;gap:12px;flex-wrap:wrap}.sessionHeader label{display:grid;gap:5px;flex:1;min-width:220px}.sessionPitches{display:flex;gap:8px;flex-wrap:wrap}.sessionPitches button{font-size:12px}.selectedPitch{border-color:var(--accent)}.sessionPanel .muted{margin:12px 0}.sessionPanel [role=status]:empty{display:none}#uploadProgress{width:100%;height:12px}#videoFile{width:100%}html[data-workspace=analysis] .steps{gap:6px}html[data-workspace=analysis] .steps li{font-size:11px}html[data-workspace=analysis] .steps li span{font-size:11px}@media(max-width:700px){.sessionPanel{margin:0 14px 14px}.sessionHeader{align-items:stretch}.sessionHeader button{flex:1}}
+
+/* Keep shared workspace elements available to the script but out of the analysis UI. */
+html[data-workspace="analysis"] #trainingNav,
+html[data-workspace="analysis"] #workspaceEyebrow {
+  display: none;
+}

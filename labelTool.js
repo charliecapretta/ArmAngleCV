@@ -2,6 +2,9 @@
 
 const WORKSPACE = document.documentElement?.dataset.workspace === "analysis" ? "analysis" : "training";
 const ANALYSIS = WORKSPACE === "analysis";
+const HOSTED = document.documentElement?.dataset.hosted === "true";
+const HAS_EXAMPLE = document.documentElement?.dataset.example === "true";
+const csrfToken = () => HOSTED ? document.querySelector('meta[name="csrf-token"]')?.content || "" : "";
 
 const state = {
   pitches: [], sessionFilter: "", exporting: false, index: 0, current: null, labels: new Map(), history: [], drafts: new Map(),
@@ -21,6 +24,9 @@ const el = id => document.getElementById(id);
 const canvas = el("stage"), ctx = canvas.getContext("2d");
 const keyOf = pitch => `${pitch.gamePk}_${pitch.playId}`;
 const blocked = () => state.busy || state.loading;
+// Uploads have no reference angle; the practice clip does, and comparing
+// against it is the reason to offer one. Training always sees the reference.
+const showsReference = () => !ANALYSIS || !!state.current?.example;
 const hasValue = value => value !== "" && value != null && Number.isFinite(Number(value));
 const hasPoint = (row, name) => hasValue(row?.[`${PREFIX[name]}_x`]) && hasValue(row?.[`${PREFIX[name]}_y`]);
 function isComplete(row) {
@@ -38,7 +44,7 @@ async function request(url, body) {
   if (["/api/pitches", "/api/labels"].includes(url)) url += `?workspace=${WORKSPACE}`;
   if (body !== undefined) body = {...body, workspace:WORKSPACE};
   const response = await fetch(url, body === undefined ? {} : {
-    method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)
+    method:"POST", headers:{"Content-Type":"application/json", "X-CSRF-Token":csrfToken()}, body:JSON.stringify(body)
   });
   const result = await response.json();
   if (!response.ok || result.error || (body !== undefined && result.ok !== true))
@@ -152,8 +158,8 @@ function renderWorkflow() {
   el("undoSave").disabled = locked || !state.history.length;
   el("newLocalPitch").hidden = !ANALYSIS || !state.current?.isLocal;
   el("newLocalPitch").disabled = locked || state.dirty || !state.labels.has(keyOf(state.current || {}));
-  el("truthDetails").hidden = ANALYSIS || !review;
-  if (ANALYSIS || !review) { el("sanityWarn").hidden = true; el("pDelta").textContent = "—"; }
+  el("truthDetails").hidden = !showsReference() || !review;
+  if (!showsReference() || !review) { el("sanityWarn").hidden = true; el("pDelta").textContent = "—"; }
   el("resultCard").hidden = !ANALYSIS;
   el("predictAngle").hidden = !ANALYSIS;
   el("savePoints").textContent = ANALYSIS ? "Save analysis" : "Save & next pitch →";
@@ -602,7 +608,7 @@ function renderMeasure() {
 function renderSanity(angle, isProxy) {
   const truth = state.current && state.current.armAngle != null ? +state.current.armAngle : null;
   const box = el("sanityWarn");
-  if (ANALYSIS || !state.reviewing || angle === null || truth === null) {
+  if (!showsReference() || !state.reviewing || angle === null || truth === null) {
     el("pDelta").textContent = "—"; box.hidden = true; return;
   }
   const delta = angle - truth;
@@ -694,7 +700,9 @@ function sendVideo(file, metadata) {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("POST", `/api/upload?${new URLSearchParams(metadata)}`);
-    xhr.setRequestHeader("Content-Type", "video/mp4"); xhr.timeout = 180000;
+    xhr.setRequestHeader("X-CSRF-Token", csrfToken());
+    // Hosted proxy allows 120s to receive + 100s to prepare, plus response overhead.
+    xhr.setRequestHeader("Content-Type", "video/mp4"); xhr.timeout = HOSTED ? 300000 : 180000;
     xhr.upload.onprogress = event => {
       if (event.lengthComputable) el("uploadProgress").value = event.loaded / event.total * 100;
       el("uploadStatus").textContent = `Uploading… ${Math.round(el("uploadProgress").value)}%`;
@@ -715,8 +723,9 @@ function sendVideo(file, metadata) {
 async function uploadVideo() {
   if (blocked()) return;
   const file = el("videoFile").files?.[0];
-  if (!file || !/\.mp4$/i.test(file.name) || file.size <= 0 || file.size > 100 * 1024 * 1024) {
-    el("importError").textContent = "Choose an MP4 video no larger than 100 MB."; el("importError").hidden = false; return;
+  const maxMB = HOSTED ? 50 : 100;
+  if (!file || !/\.mp4$/i.test(file.name) || file.size <= 0 || file.size > maxMB * 1024 * 1024) {
+    el("importError").textContent = `Choose an MP4 video no larger than ${maxMB} MB.`; el("importError").hidden = false; return;
   }
   stopPlayback(); stashDraft(); state.busy = true; renderWorkflow();
   el("importSubmit").disabled = true; el("uploadProgress").hidden = false; el("uploadProgress").value = 0;
@@ -881,18 +890,19 @@ window.addEventListener("beforeunload", event => {
   if (state.dirty || state.drafts.size) { event.preventDefault(); event.returnValue = ""; }
 });
 function configureWorkspace() {
-  document.title = ANALYSIS ? "Arm Angle · Pitch analysis" : "Arm Angle · Training labeler";
+  document.title = ANALYSIS ? "Arm Angle CV · Pitch analysis" : "Arm Angle CV · Training labeler";
   el("analysisNav").className = ANALYSIS ? "active" : "";
   el("trainingNav").className = ANALYSIS ? "" : "active";
   el("workspaceBadge").textContent = ANALYSIS ? "YOUR FOOTAGE" : "DATASET WORKSPACE";
   el("workspaceEyebrow").textContent = ANALYSIS ? "UNDERSTAND YOUR DELIVERY" : "BUILD THE DATASET";
   el("workspaceTitle").textContent = ANALYSIS ? "Pitch analysis" : "Training labeler";
   el("workspaceDescription").textContent = ANALYSIS ? "Upload → lock release → mark five points → save → export CSV." : "One pitch at a time. Choose the release, mark the points, then review and save.";
-  const options = ANALYSIS ? [["local","My footage"],["batch","MLB examples"],["all","All available clips"]]
+  const options = HOSTED ? [["local","My footage"]] : ANALYSIS ? [["local","My footage"],["batch","MLB examples"],["all","All available clips"]]
     : [["batch","New MLB trial batch"],["release","Need release"],["points","Need points"],["all","All MLB pitches"]];
   el("queueFilter").replaceChildren();
   for (const [value,label] of options) { const o = document.createElement("option");o.value = value;o.textContent = label;el("queueFilter").append(o); }
   el("queueFilter").value = ANALYSIS ? "local" : (state.pitches.some(p => p.uiTestBatch) ? "batch" : "release");
+  if (HOSTED) el("startExample").hidden = !HAS_EXAMPLE;
 }
 el("prevFrame").addEventListener("click", () => goToFrame(state.frame-1));
 el("nextFrame").addEventListener("click", () => goToFrame(state.frame+1));
@@ -900,7 +910,30 @@ el("reviewPoints").addEventListener("click", goReview);
 el("editPoints").addEventListener("click", editPoints);
 el("startVideo").addEventListener("click", () => el("openImport").click());
 el("startLocal").addEventListener("click", () => { el("queueFilter").value = "local"; const p = state.pitches.find(p => p.isLocal); if (p) showPitch(state.pitches.indexOf(p)); });
-el("startExample").addEventListener("click", () => { state.sessionFilter = ""; el("queueFilter").value = "batch"; const p = state.pitches.find(p => p.uiTestBatch); if (p) showPitch(state.pitches.indexOf(p)); });
+async function openExample() {
+  if (blocked()) return;
+  if (!HOSTED) {
+    state.sessionFilter = ""; el("queueFilter").value = "batch";
+    const local = state.pitches.find(p => p.uiTestBatch);
+    if (local) await showPitch(state.pitches.indexOf(local));
+    return;
+  }
+  // Hosted visitors get a copy of the shared clip of their own, so practice
+  // annotations, exports and deletions stay inside their own workspace.
+  el("startExample").disabled = true; state.busy = true;
+  try {
+    const data = await request("/api/example", {});
+    state.busy = false;
+    let index = state.pitches.findIndex(p => p.playId === data.pitch.playId);
+    if (index < 0) index = state.pitches.push(data.pitch) - 1;
+    state.sessionFilter = data.pitch.sessionId; el("queueFilter").value = "local";
+    await showPitch(index);
+  } catch (error) {
+    state.busy = false; el("startExample").disabled = false;
+    el("intro").hidden = false; el("intro").textContent = `Could not open the example: ${error.message}`;
+  }
+}
+el("startExample").addEventListener("click", openExample);
 el("downloadResult").addEventListener("click", exportSession);
 el("exportSession").addEventListener("click", exportSession);
 el("sessionSelect").addEventListener("change", async event => {
@@ -918,7 +951,7 @@ async function boot() {
     if (ANALYSIS) {
       el("intro").hidden = true;el("startPanel").hidden = false;
       el("startLocal").disabled = !state.pitches.some(p => p.isLocal);
-      el("startExample").disabled = !state.pitches.some(p => p.uiTestBatch);
+      el("startExample").disabled = HOSTED ? !HAS_EXAMPLE : !state.pitches.some(p => p.uiTestBatch);
       return;
     }
     if (!state.pitches.length) { el("intro").textContent = "No MLB clips yet. Add a pitch batch to begin labeling."; return; }

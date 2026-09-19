@@ -58,3 +58,12 @@ predictions.csv
 
 # Uploaded videos belong to the local user, never a release.
 uploads/
+
+# Hosted runtime data and secrets.
+.hosted-data/
+.env
+*.env
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
+*.tar.gz

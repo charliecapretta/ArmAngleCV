@@ -440,7 +440,7 @@ def labelPathFor(row):
     return LOCAL_LABELS_PATH if str(row.get("game_pk")) == "local" else LABELS_PATH
 
 
-def validateLabel(row):
+def validateLabel(row, entry=None, pitch=None):
     row = dict(row)
     if row.get("workspace") not in (None, "training", "analysis"):
         raise ValueError("Unknown workspace")
@@ -450,7 +450,8 @@ def validateLabel(row):
     if status not in ("release_selected", "labeled", "occluded", "skipped"):
         raise ValueError("Unknown label status")
     dirName = f"{row.get('game_pk')}_{row.get('play_id')}"
-    entry = getClip(dirName)
+    if entry is None:
+        entry = getClip(dirName)
     if entry is None:
         raise ValueError("Could not read this video")
     rawFrame = row.get("frame_index")
@@ -463,7 +464,8 @@ def validateLabel(row):
     # (a user's own reel in ~/Downloads) has no relative form and is kept as is.
     row.update(frame_index=frameIndex, img_w=entry["imgW"], img_h=entry["imgH"],
                fps=entry["fps"], release_time_sec=entry["frameTimes"][frameIndex],
-               source_video=relativeSourceVideo(clipPathFor(dirName)))
+               source_video=(pitch['sourceName'] if pitch is not None else
+                             relativeSourceVideo(clipPathFor(dirName))))
     row["ball_visibility"] = "occluded" if status == "occluded" else (
         "visible" if status == "labeled" else "")
     for field, allowed in (("release_quality", ("unreviewed", "closest_available", "unclear")),
@@ -491,6 +493,11 @@ def validateLabel(row):
                 row[key] = value
     if status in ("release_selected", "skipped"):
         row["provenance"] = row["seeded"] = ""
+    if pitch is not None:
+        row['pitcher_id'] = ''
+        row['pitcher_name'] = pitch.get('pitcherName', '')
+        row.update(deriveAngles(row))
+        return row
     return deriveColumns(row)
 
 

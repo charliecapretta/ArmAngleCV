@@ -1,5 +1,35 @@
 # Arm Angle from Broadcast Video — handoff
 
+## Hosted practice clip — September 19, 2026
+
+The deployed site hid "Try an MLB example" (`if (HOSTED) startExample.hidden = true`)
+and collapsed the queue to one option, so a visitor without an MP4 of their own
+reached a dead end: a disabled tile and an empty hero column. The example is back,
+built for hosting rather than borrowed from the local batch queue.
+
+`hosted/example.py` installs one prepared clip under `<data>/examples/<slug>/`,
+outside the per-visitor `videos/` tree that retention sweeps. `POST /api/example`
+gives the caller an ordinary video and pitch of their own whose frames are hard
+links to that copy. Every other path -- ownership, labels, undo, export, account
+deletion, backup and restore -- treats the clone as an upload with no special case,
+at no disk cost and no storage quota, and a repeat request reopens the same pitch
+instead of stacking copies. Deleting or expiring a clone drops a link; the
+installed clip survives. Install with `hosted.manage example install <mp4>`,
+optionally `--meta` with a `uiTestBatch.json` entry.
+
+The clone carries `armAngle`, and hosted `validate()` now takes `true_arm_angle`
+and `park` from the pitch rather than the posted row, so the browser cannot rewrite
+the reference its own annotation is scored against. The review step reveals that
+reference for the example only (`showsReference()`), which is the point of a
+practice run; uploads still show none.
+
+Installed locally with the Scherzer curveball from `uiTestBatch.json` (38.2 degrees,
+354 frames, 66 MB prepared) and verified end to end in a browser: clone, frame
+serving, release, five points, estimate 46.0 against the revealed 38.2, save, CSV.
+68 Python / 23 JavaScript tests pass. Serving MLB footage to every visitor is a
+redistribution question `DATA_SOURCES.md` now records; the clip is installed on the
+server, never in the public file set, and `example remove` withdraws it.
+
 ## Hosted V1 preparation — September 14, 2026
 
 Owner confirmed $100 Azure student credit and requested stages 2 and 3 of

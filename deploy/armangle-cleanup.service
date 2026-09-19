@@ -1,0 +1,17 @@
+[Unit]
+Description=Expire Arm Angle CV private video sessions
+
+[Service]
+Type=oneshot
+User=armangle
+Group=armangle
+WorkingDirectory=/opt/armangle
+EnvironmentFile=/etc/armangle.env
+Environment=OPENBLAS_NUM_THREADS=1
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/opt/armangle/.venv/bin/python -m hosted.manage cleanup
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/armangle

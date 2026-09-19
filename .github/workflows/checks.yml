@@ -17,12 +17,14 @@ jobs:
         with:
           python-version: '3.12'
           cache: pip
-          cache-dependency-path: requirements.txt
+          cache-dependency-path: |
+            requirements.txt
+            requirements-hosted.txt
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Install manual dependencies only
-        run: python -m pip install -r requirements.txt
+      - name: Install manual and hosted dependencies
+        run: python -m pip install -r requirements-hosted.txt
       - name: Python tests including isolated server startup and export
         run: python -m unittest discover -s tests -v
       - name: Browser workflow logic
@@ -31,3 +33,5 @@ jobs:
         run: python tools/checkRelease.py
       - name: Build the public file set
         run: python tools/prepareRelease.py --out release/public
+      - name: Build the Elastic Beanstalk source bundle
+        run: python tools/prepareBeanstalk.py --out release/beanstalk.zip
