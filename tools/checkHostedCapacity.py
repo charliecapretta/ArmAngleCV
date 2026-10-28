@@ -1,4 +1,4 @@
-"""Bounded synthetic 1080p/60fps/30s measurement; rerun on the actual AWS instance."""
+"""Bounded synthetic 1080p/60fps/60s measurement; rerun on the actual AWS instance."""
 import json
 import os
 from pathlib import Path
@@ -26,7 +26,7 @@ def measure():
         frame = np.zeros((1080,1920,3), dtype=np.uint8)
         frame[:,:,0] = np.arange(1920, dtype=np.uint16) % 256
         frame[:,:,1] = np.arange(1080, dtype=np.uint16)[:,None] % 256
-        for i in range(1800):
+        for i in range(3600):
             image = frame.copy()
             cv2.circle(image, (100+i%1000,360), 50, (255,255,255), -1)
             writer.write(image)
@@ -38,12 +38,12 @@ def measure():
         if result.returncode:
             raise RuntimeError(result.stderr)
         scale = 1024**2 if sys.platform=='darwin' else 1024
-        return dict(platform=sys.platform, clip='Synthetic 1920x1080, 60 fps, 30 seconds; not representative of all uploads',
+        return dict(platform=sys.platform, clip='Synthetic 1920x1080, 60 fps, 60 seconds; not representative of all uploads',
                     source_mb=round((root/'source.mp4').stat().st_size/1024**2,2),
                     preparation_seconds=round(time.monotonic()-started,2),
                     decoder_peak_rss_mb=round(resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss/scale,2),
                     measurement_process_peak_rss_mb=round(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss/scale,2),
-                    prepared_frame_count=len(list(root.glob('*.jpg'))),
+                    prepared_frame_count=json.loads((root/'meta.json').read_text())['nFrames'],
                     total_disk_mb=round(sum(p.stat().st_size for p in root.iterdir())/1024**2,2),
                     limitation='This does not verify Linux service limits or concurrent live-user capacity. Repeat on the actual 1 GB instance.')
 

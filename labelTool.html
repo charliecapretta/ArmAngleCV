@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Arm Angle · Training labeler</title>
-<link rel="stylesheet" href="workspace.css?v=20260919-analysis-header">
+<link rel="stylesheet" href="workspace.css?v=20260924-practice-flow">
 </head>
 <body>
 <header class="topbar">
@@ -15,26 +15,38 @@
   <div><p class="eyebrow" id="workspaceEyebrow">BUILD THE DATASET</p><h1 id="workspaceTitle">Training labeler</h1><p id="workspaceDescription">One pitch at a time. Choose the release, mark the points, then review and save.</p></div>
   <button id="openImport" class="analysisOnly secondary">Upload a video</button>
 </section>
+<details id="pitchNavigation" class="pitchNavigation" open><summary>Switch session or queue</summary>
+  <label class="analysisOnly sessionPicker">Video session <select id="sessionSelect" aria-label="Choose video session"></select></label>
 <section class="queuebar" aria-label="Pitch queue">
   <label id="queueLabel">Queue <select id="queueFilter" aria-label="Labeling queue"><option value="batch">New MLB trial batch</option><option value="release">Need release</option><option value="points">Need points</option><option value="all">All MLB pitches</option><option value="local">My videos</option></select></label>
   <label class="pitchPicker">Pitch <select id="pitchSelect" aria-label="Choose pitch"></select></label>
   <div class="pitchNav"><button id="prevPitch" class="secondary" aria-label="Previous pitch">←</button><button id="nextPitch" class="secondary" aria-label="Next pitch">→</button></div>
   <span id="progress" class="muted"></span>
 </section>
+</details>
 <form id="importPanel" hidden>
   <p class="eyebrow">START AN ANALYSIS</p><h2>Upload your footage</h2><p class="muted">One video becomes a session. Tag each delivery as a separate pitch.</p>
   <label>Video file<input id="videoFile" type="file" accept=".mp4,video/mp4" required></label>
   <div class="fields"><label>Pitcher <input id="importPitcher" maxlength="160" placeholder="Optional name"></label><label>Session name <input id="importSession" maxlength="160" placeholder="Optional — defaults to video name"></label><label>Throws <select id="importThrows"><option value="R">Right</option><option value="L">Left</option></select></label></div>
-  <p class="muted">MP4 · up to 100 MB, 60 seconds, 1920 × 1080, 60 fps, and 3,600 frames. A copy is saved by this app.</p><p class="smallNote">Estimated arm angle from an MLB-trained model. Accuracy on college footage has not been established.</p><progress id="uploadProgress" max="100" value="0" hidden aria-label="Video upload progress"></progress><p id="uploadStatus" role="status"></p><p id="importError" role="alert" hidden></p>
+  <div id="uploadInfo"><ul class="uploadFacts"><li>MP4 · up to 100 MB, 60 seconds, 1920 × 1080, 60 fps, and 3,600 frames.</li><li>A copy is saved by this app.</li></ul></div><p class="smallNote">Estimated arm angle from an MLB-trained model. Accuracy on college footage has not been established.</p><progress id="uploadProgress" max="100" value="0" hidden aria-label="Video upload progress"></progress><p id="uploadStatus" role="status"></p><p id="importError" role="alert" hidden></p>
   <div class="actions"><button id="importSubmit" type="submit">Upload video</button><button id="closeImport" type="button" class="secondary">Cancel</button></div>
 </form>
 <section id="intro" class="emptyState"><h2>Loading your workspace…</h2><p>Preparing the pitch queue.</p></section>
-<section id="startPanel" class="startPanel" hidden>
-  <div><p class="eyebrow">YOUR NEXT PITCH</p><h2>From footage to an angle estimate.</h2><p>Pick a release frame, place five points, and review the result. You stay in control of every point.</p><button id="startVideo">Upload a video</button></div>
-  <div class="startChoices"><button id="startLocal" class="choice"><b>Continue your saved footage →</b><span>Reopen your existing pitch annotations.</span></button><button id="startExample" class="choice"><b>Try an MLB example →</b><span>Practice the flow with a short pitch clip.</span></button></div>
+<section id="startPanel" class="startPanel" hidden aria-labelledby="startTitle">
+  <div class="startIntro">
+    <p class="eyebrow">A CLEARER LOOK AT EACH PITCH</p>
+    <h1 id="startTitle">See your pitch.<br>Find your arm angle.</h1>
+    <p>Choose a release frame, mark five points, and review your angle estimate. Start with your footage or give it a try with an MLB example.</p>
+  </div>
+  <div class="startChoices" aria-label="Start an analysis">
+    <button id="startVideo" class="choice primaryChoice"><b>Upload a video <span aria-hidden="true">→</span></b><span>Analyze your own pitching footage.</span><small>Choose an MP4 to get started</small></button>
+    <button id="startLocal" class="choice" hidden><b>Continue your uploads →</b><span id="startLocalDescription">Reopen your saved pitches.</span></button><button id="startExample" class="choice"><b id="exampleTitle">Try an example →</b><span id="exampleDescription">Explore the steps with an MLB pitch. No video needed.</span></button>
+  </div>
+  <ol class="startSteps" aria-label="How it works"><li><span>1</span> Choose the release</li><li><span>2</span> Mark five points</li><li><span>3</span> Review your estimate</li></ol>
+  <p class="startNote">You control every point. Export your results as CSV when you’re done.</p>
 </section>
 <section id="sessionPanel" class="sessionPanel analysisOnly" hidden aria-label="Saved session">
-  <div class="sessionHeader"><label>Video session <select id="sessionSelect" aria-label="Choose video session"></select></label><button id="exportSession" class="secondary">Export session CSV</button><button id="newLocalPitch" class="secondary" hidden>Another pitch from this video</button></div>
+  <div class="sessionHeader"><button id="exportSession" class="secondary">Export CSV</button><button id="newLocalPitch" class="secondary" hidden>Another pitch from this video</button></div>
   <p id="sessionSummary" class="muted"></p><p id="exportStatus" role="status"></p><a id="csvFallback" download="arm-angle-session.csv" hidden>Download CSV directly</a>
   <div id="sessionPitches" class="sessionPitches" aria-label="Pitches in this session"></div>
   <p class="smallNote">CSV includes saved pitches only. Finish or save your edits before exporting. Release frames start at 0; angles are in degrees.</p>
@@ -51,23 +63,29 @@
   <section class="workflow" aria-label="Guided workflow">
     <ol class="steps" aria-label="Progress"><li id="uploadStep" class="analysisOnly done">✓ <span>Upload</span></li><li id="releaseStep">1 <span>Release</span></li><li id="pointsStep">2 <span>Points</span></li><li id="reviewStep">3 <span>Review</span></li><li id="exportStep" class="analysisOnly">5 <span>Export</span></li></ol>
     <p class="eyebrow" id="stepNumber">STEP 1 OF 3</p><h2 id="stepTitle">Choose the release</h2><p id="stepHelp"></p>
-    <div id="releaseActions"><button id="confirmRelease" class="primaryAction">Use this frame →</button><p class="smallNote">A blurred, approximate release is okay. Compare nearby frames before continuing.</p></div>
-    <div id="pointActions" hidden><div class="nextPoint"><span id="pointCount">0 of 5 points</span><b id="pointPrompt">Place the throwing shoulder</b></div><div id="pointButtons"></div><label id="occludedLabel"><input id="ballOccluded" type="checkbox"> Ball cannot be located</label><button id="reviewPoints" class="primaryAction">Review these points →</button><button id="zoomPoints" class="textButton">Zoom / full frame</button><button id="changeRelease" class="textButton">← Change release frame</button></div>
+    <div id="releaseActions"><p id="releaseHint" class="releaseHint analysisOnly">This is a preview frame, not a suggested release. Scrub until the ball is just leaving the hand, then compare nearby frames.</p><button id="confirmRelease" class="primaryAction">Use this frame →</button><p class="smallNote">A blurred, approximate release is okay. Compare nearby frames before continuing.</p></div>
+    <div id="pointActions" hidden><div class="nextPoint"><span id="pointCount">0 of 5 points</span><b id="pointPrompt">Place the throwing shoulder</b></div><div id="pointButtons"></div><label id="occludedLabel"><input id="ballOccluded" type="checkbox"> Ball cannot be located</label><button id="reviewPoints" class="primaryAction">Review these points →</button><button id="zoomPoints" class="textButton">Zoom to pitcher (Z)</button><button id="changeRelease" class="textButton">← Change release frame</button></div>
     <div id="reviewActions" hidden>
-      <div class="measuredCard"><span class="resultLabel">MEASURED SHOULDER → BALL</span><p id="reviewBallAngle">—</p><span id="reviewBallNote" class="smallNote">From your marked points, relative to image horizontal. Camera perspective affects this measurement.</span></div>
+      <div class="reviewActionBar">
+        <button id="savePoints" class="primaryAction">Save &amp; next pitch →</button>
+        <button id="nextReviewPitch" class="primaryAction analysisOnly" hidden>Next pitch →</button>
+        <button id="downloadResult" class="secondary analysisOnly">Export CSV</button>
+        <p id="reviewSaved" class="success" role="status" hidden>Saved.</p>
+      </div>
+      <div id="practiceComparison" class="practiceComparison" role="status" hidden><strong id="practiceError"></strong><p id="practiceTip"></p></div>
+      <div class="measuredCard"><span class="resultLabel" id="reviewBallLabel">MEASURED SHOULDER → BALL</span><p id="reviewBallAngle">—</p><span id="reviewBallNote" class="smallNote">From your marked points, relative to image horizontal. Camera perspective affects this measurement.</span></div>
       <div id="resultCard" class="resultCard"><span class="resultLabel">ESTIMATED ARM ANGLE</span><p id="anglePrediction" role="status">—</p><span class="smallNote">Estimated arm angle from an MLB-trained model. Accuracy on college footage has not been established.</span></div>
       <dl id="reviewSummary" class="reviewSummary"></dl>
-      <div id="truthDetails" class="truthDetails" hidden><span>Statcast reference</span><b id="pTruth">—</b><p class="smallNote">Review the visible points on their own merits. This reference is revealed only after placement.</p></div>
-      <div id="reviewSaved" class="success" hidden>Saved. Ready for the next pitch.</div>
-      <button id="savePoints" class="primaryAction">Save &amp; next pitch →</button><button id="editPoints" class="textButton">← Adjust points</button><button id="predictAngle" class="textButton">Recalculate estimate</button><button id="downloadResult" class="textButton analysisOnly">Export session CSV</button>
+      <div id="truthDetails" class="truthDetails" hidden><span id="pTruthLabel">Statcast reference</span><b id="pTruth">—</b><p id="pTruthNote" class="smallNote">Review the visible points on their own merits. This reference is revealed only after placement.</p></div>
+      <button id="editPoints" class="textButton">← Adjust points</button><button id="predictAngle" class="textButton">Recalculate estimate</button>
     </div>
     <details id="reviewOptions" class="options"><summary>Quality &amp; labeling guidance</summary><label>Release choice <select id="releaseQuality"><option value="unreviewed">Not reviewed</option><option value="closest_available">Closest available frame</option><option value="unclear">Release timing unclear</option></select></label><label id="pointQualityLabel" hidden>Point clarity <select id="pointQuality"><option value="unreviewed">Not reviewed</option><option value="reviewed">Points reviewed</option><option value="uncertain">One or more points uncertain</option></select></label><p>Keep all points on the selected frame. Click the shoulder joint where the upper arm meets the torso, the opposite shoulder joint, elbow joint, wrist joint, then the ball center. Avoid the sleeve edge.</p><p>30 fps footage cannot always show the exact release. Mark timing or points uncertain when needed. These flags are review notes, not a confidence score.</p><p class="analysisOnly">Zero degrees is horizontal; positive is above the shoulder and negative is below. Left/right direction is folded. The image measurement is not a verified real-world arm angle. Model estimates use the frozen manual-v1 model. CSV predictions are recalculated from saved points.</p></details>
     <details id="extraTools" class="options"><summary>More tools</summary><div class="actions"><button id="seedPoints" class="secondary trainingOnly">Suggest body points</button><button id="choosePitcher" class="secondary trainingOnly">Select pitcher for suggestions</button><button id="releaseNext" class="secondary trainingOnly">Save release only &amp; next</button><button id="skipPitch" class="secondary">Skip this pitch</button><button id="undoSave" class="secondary">Undo last save</button><a id="downloadRelease" download>Download frame</a></div></details>
     <div class="warnBox" id="sanityWarn" hidden></div><div class="warnBox" id="seedWarn" hidden></div>
-    <details class="options" id="measurePanel"><summary>Image measurements</summary><dl><dt>Throwing shoulder</dt><dd id="pShoulder">—</dd><dt>Off shoulder</dt><dd id="pOffShoulder">—</dd><dt>Elbow</dt><dd id="pElbow">—</dd><dt>Wrist</dt><dd id="pWrist">—</dd><dt>Ball</dt><dd id="pBall">—</dd><dt>Shoulder → ball</dt><dd id="pAngle">—</dd><dt>Shoulder → wrist</dt><dd id="pAngleWrist">—</dd><dt class="trainingOnly">Reference difference</dt><dd id="pDelta" class="trainingOnly">—</dd></dl></details>
+    <details class="options" id="measurePanel"><summary>Image measurements</summary><dl><dt>Throwing shoulder</dt><dd id="pShoulder">—</dd><dt>Glove side shoulder</dt><dd id="pOffShoulder">—</dd><dt>Elbow</dt><dd id="pElbow">—</dd><dt>Wrist</dt><dd id="pWrist">—</dd><dt>Ball</dt><dd id="pBall">—</dd><dt>Shoulder → ball</dt><dd id="pAngle">—</dd><dt>Shoulder → wrist</dt><dd id="pAngleWrist">—</dd><dt class="trainingOnly">Reference difference</dt><dd id="pDelta" class="trainingOnly">—</dd></dl></details>
   </section>
-  <section class="workspaceFooter"><details><summary>Clip details &amp; shortcuts</summary><dl id="meta"></dl><p>← / →: one frame · Shift + arrows: ten frames · Space: play / pause · 1–5: replace a point · Enter: continue · Z: zoom · U: undo</p></details><details class="trainingOnly"><summary>Training coverage</summary><div id="hist"></div><div id="histNote"></div></details></section>
+  <section class="workspaceFooter"><details><summary>Clip details &amp; shortcuts</summary><dl id="meta"></dl><p>← / →: one frame · Shift + arrows: ten frames · Space: play / pause · 1–5: replace a point · Enter: continue · Z: zoom to the pitcher or back to the full frame · + / −: zoom in or out · scroll: zoom at the cursor · Shift + drag: pan · U: undo</p></details><details class="trainingOnly"><summary>Training coverage</summary><div id="hist"></div><div id="histNote"></div></details></section>
 </main>
 <div id="toast"></div>
-<script src="labelTool.js?v=20260914-manual-v1"></script>
+<script src="labelTool.js?v=20260924-continue-uploads"></script>
 </body></html>

@@ -8,13 +8,14 @@ function harness(workspace='training', hosted=false, example=false) {
   const elements = new Map();
   class Element {
     constructor(tag='DIV') { this.tagName=tag; this.dataset={}; this.value='all'; this.width=1280; this.height=720; this.hidden=false; this.children=[]; this.style={}; this.classList={add(){},remove(){}}; }
-    addEventListener() {} replaceChildren(...x) { this.children=x; } append(...x) { this.children.push(...x); }
+    addEventListener(type,fn) { (this.handlers ||= {})[type]=fn; } replaceChildren(...x) { this.children=x; } append(...x) { this.children.push(...x); }
     click() { this.clicked=true; }
     getContext() { return new Proxy({}, {get:()=>()=>{}}); } focus() {}
   }
   const context = vm.createContext({console,Map,Math,Number,JSON,Error,Promise,performance,URLSearchParams,
+    FormData:class {constructor(){this.fields=[];}append(...args){this.fields.push(args);}},
     setTimeout:()=>1,clearTimeout(){},fetch:async()=>({ok:true,json:async()=>({ok:true,undoToken:'token'})}),
-    document:{documentElement:{dataset:{workspace,hosted:String(hosted),example:example?'true':undefined}},querySelector:()=>({content:'test-csrf-token'}),getElementById:id=>{if(!elements.has(id))elements.set(id,new Element());return elements.get(id)},createElement:tag=>new Element(tag.toUpperCase()),addEventListener(){}},
+    document:{documentElement:{dataset:{workspace,hosted:String(hosted),example:example?'true':undefined}},querySelector:()=>({content:'test-csrf-token'}),getElementById:id=>{if(!elements.has(id))elements.set(id,new Element());return elements.get(id)},createElement:tag=>new Element(tag.toUpperCase()),handlers:{},addEventListener(type,fn){this.handlers[type]=fn}},
     window:{addEventListener(){}},Image:class {constructor(){this.width=1280;this.height=720;}set src(v){this.url=v;Promise.resolve().then(()=>this.onload());}}
   });
   vm.runInContext(source,context);
@@ -136,6 +137,23 @@ test('upload handles failure without losing existing annotations or leaving cont
  assert.equal(run('state.busy'),false);
  assert.match(run(`el('importError').textContent`),/Cannot decode/);
 });
+test('upload size validation allows hosted clips through 200 MiB and preserves the local limit',async()=>{
+ for (const {hosted,size,accepted,limit} of [
+   {hosted:true,size:51*1024*1024,accepted:true,limit:200},
+   {hosted:true,size:200*1024*1024,accepted:true,limit:200},
+   {hosted:true,size:200*1024*1024+1,accepted:false,limit:200},
+   {hosted:false,size:100*1024*1024,accepted:true,limit:100},
+   {hosted:false,size:100*1024*1024+1,accepted:false,limit:100},
+ ]) {
+   const {run,context}=harness('analysis',hosted);
+   context.uploadSize=size;
+   run(`el('videoFile').files=[{name:'test.mp4',size:uploadSize}];let uploadCalls=0;sendVideo=async()=>{uploadCalls++;throw new Error('Reached upload transport')};`);
+   await run('uploadVideo()');
+   assert.equal(run('uploadCalls'),Number(accepted),`hosted=${hosted}, size=${size}`);
+   assert.equal(run(`el('importError').textContent`),accepted?'Reached upload transport':`Choose an MP4 video no larger than ${limit} MB.`);
+   assert.equal(run('state.busy'),false);
+ }
+});
 test('successful upload opens its named session and retains the previous draft',async()=>{
  const {run}=harness('analysis');
  run(`el('videoFile').files=[{name:'test.mp4',size:100}];state.dirty=true;sendVideo=async()=>({ok:true,pitch:{gamePk:'local',playId:'new',dirName:'local_new',isLocal:true,sessionId:'new-session',sessionName:'Bullpen',nFrames:10,fps:30,imgW:1280,imgH:720,frameTimes:Array.from({length:10},(_,i)=>i/30)}});`);
@@ -174,24 +192,38 @@ test('hosted upload sends CSRF and waits for receive plus preparation budget', a
  assert.equal(result.pitch.playId,'uploaded');
  assert.equal(upload.method,'POST');
  assert.equal(upload.headers['X-CSRF-Token'],'test-csrf-token');
- assert.equal(upload.headers['Content-Type'],'video/mp4');
- assert.equal(upload.timeout,300000);
- assert.ok(upload.timeout > 120000 + 100000);
+ assert.equal(upload.headers['Content-Type'],undefined);
+ assert.equal(upload.url,'/api/upload');
+ assert.equal(upload.file.fields[0][0],'video');
+ assert.equal(upload.timeout,900000);
+ assert.ok(upload.timeout > 600000 + 100000);
 });
 
-test('hosted example is requested from the server and opened in the visitor workspace', async()=>{
+test('hosted examples load all five pitches with navigation and reuse saved progress', async()=>{
  const {run,elements}=harness('analysis',true,true);
- run(`let asked=[];request=async(url,body)=>{asked.push({url,body});return {ok:true,pitch:{gamePk:'local',playId:'ex',dirName:'local_ex',sessionId:'vid',nFrames:10,fps:30,imgW:1280,imgH:720,isLocal:true,uiTestBatch:true,armAngle:38.2}}};showPitch=async i=>{state.shown=i};`);
+ run(`let asked=[];const examples=Array.from({length:5},(_,i)=>({gamePk:'local',playId:'ex'+i,dirName:'local_ex'+i,sessionId:'vid'+i,pitcherName:'Pitcher '+i,example:'mlb-'+i,nFrames:10,fps:30,imgW:1280,imgH:720,isLocal:true,uiTestBatch:true,armAngle:38.2}));request=async(url,body)=>{asked.push({url,body});return {ok:true,pitches:examples,pitch:examples[0]}};showPitch=async i=>{state.shown=i;state.current=state.pitches[i];renderQueue();renderSession()};`);
  await run('openExample()');
  assert.deepEqual(run('asked[0].url'),'/api/example');
- assert.equal(run('state.pitches.length'),3);
+ assert.equal(run('state.pitches.length'),7);
  assert.equal(run('state.shown'),2);
- assert.equal(run('state.sessionFilter'),'vid');
- assert.equal(elements.get('queueFilter').value,'local');
- // Asking twice reopens the same practice pitch rather than stacking copies.
+ assert.equal(run('state.sessionFilter'),'');
+ assert.equal(elements.get('queueFilter').value,'batch');
+ assert.equal(run('visiblePitches().length'),5);
+ assert.equal(elements.get('sessionPitches').children.length,5);
+ assert.equal(elements.get('pitchSelect').children.length,5);
+ assert.match(elements.get('sessionSummary').textContent,/5 pitches/);
+ for (let i=0;i<5;i++) {
+   elements.get('sessionPitches').children[i].handlers.click();
+   assert.equal(run('state.current.playId'),'ex'+i);
+   assert.equal(elements.get('sessionPitches').children.length,5);
+ }
+ run(`state.labels.set('local_ex0',{status:'skipped'});state.drafts.set('local_ex4',{dirty:true});`);
+ // Reopening resumes an unfinished pitch without duplicating any clips or losing drafts.
  await run('openExample()');
- assert.equal(run('state.pitches.length'),3);
- assert.equal(run('state.shown'),2);
+ assert.equal(run('state.pitches.length'),7);
+ assert.equal(run('state.shown'),3);
+ assert.equal(run(`state.drafts.has('local_ex4')`),true);
+ assert.equal(elements.get('startExample').disabled,false);
 });
 test('hosted example failure explains itself and leaves the button usable', async()=>{
  const {run,elements}=harness('analysis',true,true);
@@ -215,8 +247,231 @@ test('the Statcast reference stays hidden for uploads and is revealed on the exa
  run(`state.mode='points';state.reviewing=true;state.points={shoulder:{x:100,y:200},offShoulder:{x:120,y:200},elbow:{x:150,y:180},wrist:{x:200,y:150},ball:{x:220,y:140}};`);
  run(`state.current={...state.pitches[0],armAngle:38.2};renderWorkflow();`);
  assert.equal(elements.get('truthDetails').hidden,true,'an uploaded pitch has no reference to reveal');
+ assert.equal(elements.get('reviewBallLabel').textContent,'MEASURED SHOULDER \u2192 BALL','an upload leads with its own measurement');
  run(`state.current={...state.pitches[0],armAngle:38.2,example:'mlb-example'};renderWorkflow();renderMeta();renderMeasure();`);
  assert.equal(elements.get('truthDetails').hidden,false);
- assert.equal(elements.get('pTruth').textContent,'38.2°');
- assert.match(elements.get('pDelta').textContent,/°/);
+ assert.equal(elements.get('practiceComparison').hidden,false);
+ assert.equal(elements.get('sanityWarn').hidden,true);
+ // On an MLB clip the reference leads and the measured angle moves below it.
+ assert.equal(elements.get('reviewBallLabel').textContent,'STATCAST REFERENCE');
+ assert.equal(elements.get('reviewBallAngle').textContent,'38.2\u00b0');
+ assert.equal(elements.get('pTruthLabel').textContent,'Measured shoulder \u2192 ball');
+ assert.equal(elements.get('pTruth').textContent,run(`pixelAngle('ball').toFixed(1)+'\u00b0'`));
+});
+test('training keeps the measurement in the lead so the reference cannot anchor a label', ()=>{
+ const {run,elements}=harness();
+ run(`state.mode='points';state.reviewing=true;state.points={shoulder:{x:100,y:200},offShoulder:{x:120,y:200},elbow:{x:150,y:180},wrist:{x:200,y:150},ball:{x:220,y:140}};`);
+ run(`state.current={...state.pitches[0],armAngle:38.2};renderWorkflow();`);
+ assert.equal(elements.get('truthDetails').hidden,false);
+ assert.equal(elements.get('reviewBallLabel').textContent,'MEASURED SHOULDER \u2192 BALL');
+ assert.equal(elements.get('pTruth').textContent,'38.2\u00b0');
+});
+
+const view = run => JSON.parse(run('JSON.stringify(viewTransform())'));
+const SAVED_NEIGHBOUR = `{status:'labeled',img_w:1280,shoulder_x:600,shoulder_y:300,off_shoulder_x:640,off_shoulder_y:300,elbow_x:660,elbow_y:330,wrist_x:700,wrist_y:340,ball_x:720,ball_y:330}`;
+
+test('one placed point is enough to zoom, and the view stays inside the frame',()=>{
+ const {run}=harness();
+ run(`state.mode='points';state.points={shoulder:{x:20,y:20}};fitZoom()`);
+ assert.equal(run('state.zoom'),true);
+ const v=view(run);
+ assert.ok(v.sw<1280,'a single point should zoom');
+ assert.ok(Math.abs(v.sw/v.sh-1280/720)<1e-9,'the view keeps the frame aspect ratio');
+ assert.ok(v.sx>=0&&v.sy>=0&&v.sx+v.sw<=1280&&v.sy+v.sh<=720,'the view is clamped to the image');
+});
+test('wheel zoom holds the pixel under the cursor and lets go at the full frame',()=>{
+ const {run}=harness();
+ run(`state.mode='points';zoomBy(2,{x:900,y:500})`);
+ const v=view(run);
+ assert.ok(Math.abs(v.sw-640)<1e-9);
+ assert.ok(Math.abs((900-v.sx)/v.sw-900/1280)<1e-9,'the anchor keeps its place in the view');
+ run(`zoomBy(.1,{x:900,y:500})`);
+ assert.equal(run('state.zoom'),false);
+ assert.equal(view(run).sw,1280);
+});
+test('zoom stops at the tightest view instead of running away',()=>{
+ const {run}=harness();
+ run(`state.mode='points';zoomBy(500,{x:640,y:360})`);
+ assert.ok(view(run).sw>=1280/MAX_ZOOM_FOR_TEST(run)-1e-9);
+});
+const MAX_ZOOM_FOR_TEST = run => run('MAX_ZOOM');
+test('clicks are recorded in image pixels while zoomed',()=>{
+ const {run,elements}=harness();
+ run(`state.mode='points';zoomBy(2,{x:640,y:360})`);
+ elements.get('stage').getBoundingClientRect=()=>({left:0,top:0,width:640,height:360});
+ const v=view(run);
+ const point=JSON.parse(run(`JSON.stringify(eventToImage({clientX:320,clientY:180}))`));
+ assert.ok(Math.abs(point.x-(v.sx+v.sw/2))<1e-6,'the middle of the canvas is the middle of the view');
+ assert.ok(Math.abs(point.y-(v.sy+v.sh/2))<1e-6);
+});
+test('the default crop holds where pitchers actually are',()=>{
+ const {run}=harness();
+ run(`state.mode='points';state.points={};zoomToPitcher()`);
+ assert.equal(run('state.zoom'),true);
+ const v=view(run);
+ // Every labeled point in the repository falls in x .13-.65, y .37-.81.
+ const covers=(lo,hi,from,to,size)=>from/size<=lo+1e-9&&to/size>=hi-1e-9;
+ assert.ok(covers(.13,.65,v.sx,v.sx+v.sw,1280),'the crop spans the labeled x range');
+ assert.ok(covers(.37,.81,v.sy,v.sy+v.sh,720),'the crop spans the labeled y range');
+ assert.ok(v.sw<1280,'it is still a zoom');
+});
+test('a portrait clip is cropped by its own proportions, not the frame size',()=>{
+ const {run}=harness();
+ run(`state.img={width:1080,height:1920};state.current.imgW=1080;state.current.imgH=1920;state.mode='points';state.points={};zoomToPitcher()`);
+ const v=view(run);
+ assert.ok(Math.abs(v.sw/v.sh-1080/1920)<1e-9);
+ assert.ok(v.sy/1920<=.37+1e-9&&(v.sy+v.sh)/1920>=.81-1e-9);
+});
+test('placed points outrank the default crop',()=>{
+ const {run}=harness();
+ run(`state.mode='points';state.points={shoulder:{x:600,y:300},wrist:{x:700,y:340}};zoomToPitcher()`);
+ const v=view(run);
+ assert.ok(v.sx<=600&&v.sx+v.sw>=700&&v.sy<=300&&v.sy+v.sh>=340,'the placed points are framed');
+ assert.ok(v.sw<1280*.52,'an exact answer crops tighter than the general one');
+});
+test('locking the release frame zooms to the pitcher',async()=>{
+ const {run}=harness();
+ run(`let zoomCalls=0;zoomToPitcher=()=>{zoomCalls++};request=async()=>({ok:true,undoToken:'t'})`);
+ await run('confirmRelease()');
+ assert.equal(run('state.mode'),'points');
+ assert.equal(run('zoomCalls'),1);
+});
+test('changing the release frame returns to the full frame',()=>{
+ const {run}=harness();
+ run(`state.mode='points';state.points={shoulder:{x:600,y:300}};fitZoom();changeRelease()`);
+ assert.equal(run('state.zoom'),false);
+ assert.equal(run('state.pan'),null);
+ assert.equal(view(run).sw,1280);
+});
+
+const press = (run,key) => run(`document.handlers.keydown({key:'${key}',target:{tagName:'CANVAS'},preventDefault(){}})`);
+
+test('Z toggles the zoom while placing points and while reviewing them',()=>{
+ const {run}=harness();
+ run(`state.mode='points';state.points={shoulder:{x:600,y:300},wrist:{x:700,y:340}}`);
+ press(run,'z');
+ assert.equal(run('state.zoom'),true);
+ assert.ok(view(run).sw<1280);
+ press(run,'z');
+ assert.equal(run('state.zoom'),false);
+ assert.equal(view(run).sw,1280);
+ run(`state.reviewing=true`);
+ press(run,'z');
+ assert.equal(run('state.zoom'),true,'review is where points get checked, so zoom belongs there too');
+});
+test('+ and - step the zoom, and a pose suggestion in flight holds the view still',()=>{
+ const {run}=harness();
+ run(`state.mode='points'`);
+ press(run,'+');
+ const zoomed=view(run).sw;
+ assert.ok(zoomed<1280);
+ press(run,'-');
+ assert.ok(view(run).sw>zoomed);
+ run(`state.poseBusy=true`);
+ const held=view(run).sw;
+ press(run,'+');
+ assert.equal(view(run).sw,held);
+});
+
+test('preview and full-size clicks store identical original coordinates, including zoom',()=>{
+ const {run}=harness('analysis',true);
+ run(`canvas.getBoundingClientRect=()=>({left:10,top:20,width:640,height:360});
+      state.mode='points'; state.img={width:640,height:360}; draw();
+      let previewPoint=eventToImage({clientX:330,clientY:200});
+      state.points.shoulder=previewPoint; let previewRow=buildRow('release_selected');
+      state.img={width:1280,height:720}; draw();
+      let fullPoint=eventToImage({clientX:330,clientY:200});
+      state.points.shoulder=fullPoint; let fullRow=buildRow('release_selected');`);
+ assert.equal(run('previewPoint.x'),640); assert.equal(run('previewPoint.y'),360);
+ assert.equal(run('previewRow.shoulder_x'),run('fullRow.shoulder_x'));
+ assert.equal(run('previewRow.shoulder_y'),run('fullRow.shoulder_y'));
+ run(`state.zoom=true;state.zoomView={sx:400,sy:200,sw:400,sh:225};
+      state.img={width:640,height:360};draw();previewPoint=eventToImage({clientX:330,clientY:200});
+      state.img={width:1280,height:720};draw();fullPoint=eventToImage({clientX:330,clientY:200});`);
+ assert.equal(run('previewPoint.x'),run('fullPoint.x'));
+ assert.equal(run('previewPoint.y'),run('fullPoint.y'));
+ assert.equal(run('fullPoint.x'),600);
+});
+test('hosted browsing requests scrub frames, locking fetches only one full frame',async()=>{
+ const {run}=harness('analysis',true);
+ run(`let imageUrls=[];imageFor=async url=>{imageUrls.push(url);return {width:1280,height:720}};`);
+ await run('loadFrame()');
+ assert.equal(run(`imageUrls.every(url=>url.includes('size=scrub&privacy=2'))`),true);
+ run(`imageUrls=[];request=async()=>({ok:true});`);
+ await run('confirmRelease()');
+ assert.equal(run('imageUrls.length'),1);
+ assert.equal(run(`imageUrls[0].includes('size=full&privacy=2')`),true);
+ run('renderThumbs()');
+ assert.equal(run(`el('thumbs').children.every(f=>f.children[0].children[0].src.includes('size=scrub&privacy=2'))`),true);
+});
+
+test('analysis confirms release without a separate inspection checkbox',async()=>{
+ const {run,elements}=harness('analysis');
+ run(`let saves=0;request=async()=>{saves++;return {ok:true}};renderWorkflow()`);
+ assert.equal(elements.get('confirmRelease').disabled,false);
+ await run('goToFrame(3)');
+ assert.equal(elements.get('confirmRelease').disabled,false);
+ await run('confirmRelease()');
+ assert.equal(run('state.mode'),'points');
+ assert.equal(run('saves'),1);
+});
+test('MLB previews begin at frame 180 while saved work and uploads retain their frame',async()=>{
+ const {run}=harness('analysis');
+ run(`state.current.nFrames=300;state.current.frameTimes=[];`);
+ await run('showPitch(0)');
+ assert.equal(run('state.frame'),180);
+ assert.equal(run(`initialFrame(state.current,{frame_index:175})`),175);
+ assert.equal(run(`initialFrame({isLocal:true,startFrame:42})`),42);
+ run(`state.current.nFrames=100`);
+ await run('showPitch(0)');
+ assert.equal(run('state.frame'),99);
+});
+test('practice error compares the model estimate with Statcast to one decimal',()=>{
+ const {run,elements}=harness('analysis');
+ run(`state.current.example='rogers';state.current.armAngle=-59.9;state.predictedAngle=-40.6;state.mode='points';state.reviewing=true;renderWorkflow()`);
+ assert.equal(elements.get('practiceError').textContent,'Off by 19.3°');
+ assert.match(elements.get('practiceTip').textContent,/Check your release frame/);
+ run(`state.predictedAngle=-59.9;renderWorkflow()`);
+ assert.equal(elements.get('practiceError').textContent,'Off by 0.0°');
+ run(`state.predictedAngle=null;renderWorkflow()`);
+ assert.equal(elements.get('practiceError').textContent,'Comparison unavailable');
+});
+test('saved practice offers the next unfinished pitch and consistent exports',async()=>{
+ const {run,elements}=harness('analysis',true,true);
+ run(`state.pitches.forEach((p,i)=>Object.assign(p,{example:'example-'+i,uiTestBatch:true,sessionId:'session-'+i,pitcherName:i?'Weissert':'Rogers'}));el('queueFilter').value='batch';state.mode='points';state.reviewing=true;state.predictedAngle=20;state.points={shoulder:{x:100,y:200},offShoulder:{x:120,y:200},elbow:{x:150,y:180},wrist:{x:200,y:150},ball:{x:220,y:140}};state.labels.set(keyOf(state.current),buildRow('labeled'));renderWorkflow()`);
+ assert.equal(elements.get('savePoints').hidden,true);
+ assert.equal(elements.get('nextReviewPitch').hidden,false);
+ assert.match(elements.get('nextReviewPitch').textContent,/Weissert/);
+ assert.equal(elements.get('workspaceBadge').textContent,'MLB PRACTICE');
+ assert.equal(elements.get('exportSession').textContent,elements.get('downloadResult').textContent);
+ assert.doesNotMatch(elements.get('stepHelp').textContent,/another pitch from this video/);
+ run(`let opened=-1;showPitch=async index=>{opened=index}`);
+ await run('continueAnalysis()');
+ assert.equal(run('opened'),1);
+ run(`state.labels.set(keyOf(state.pitches[1]),buildRow('labeled'));renderWorkflow()`);
+ assert.equal(elements.get('nextReviewPitch').hidden,true);
+ assert.match(elements.get('reviewSaved').textContent,/All pitches/);
+});
+test('unreviewed optional quality rows stay out of review summary',()=>{
+ const {run,elements}=harness('analysis');
+ run('renderReview()');
+ assert.deepEqual(elements.get('reviewSummary').children.filter((_,i)=>i%2===0).map(e=>e.textContent),['Release','Points']);
+ run(`state.releaseQuality='unclear';state.pointQuality='uncertain';renderReview()`);
+ assert.deepEqual(elements.get('reviewSummary').children.filter((_,i)=>i%2===0).map(e=>e.textContent),['Release','Points','Timing','Clarity']);
+});
+test('five rapid nearby clicks place five landmarks instead of grabbing an earlier point',()=>{
+ const {run,elements}=harness('analysis');
+ run(`state.mode='points'`);
+ const stage=elements.get('stage');
+ stage.getBoundingClientRect=()=>({left:0,top:0,width:1280,height:720});
+ stage.setPointerCapture=()=>{};
+ for(let i=0;i<5;i++) {
+   stage.handlers.pointerdown({clientX:100+i*2,clientY:200,button:0,pointerId:1});
+   stage.handlers.pointerup({pointerId:1});
+ }
+ assert.equal(run('Object.keys(state.points).length'),5);
+ assert.equal(run('state.points.ball.x'),108);
+ assert.equal(elements.get('reviewPoints').disabled,false);
+ stage.handlers.pointerdown({clientX:100,clientY:200,button:0,pointerId:1});
+ assert.equal(run('state.drag'),'shoulder','completed points still support dragging');
 });

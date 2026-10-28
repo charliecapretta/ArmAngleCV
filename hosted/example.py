@@ -8,10 +8,12 @@ treats it exactly like an upload, at no extra disk cost and without touching the
 storage budget. Retention expires the clone, not the shared original.
 """
 import json
+import hashlib
 import os
 from pathlib import Path
 import re
 import shutil
+import tempfile
 import time
 import uuid
 
@@ -46,6 +48,14 @@ def describe(root, slug):
     if not isinstance(pitch, dict) or not isinstance(meta, dict) or not isinstance(meta.get('nFrames'), int) or meta['nFrames'] < 1:
         raise ValueError('The installed example is incomplete. Reinstall it.')
     return pitch, meta
+
+
+def frameNames(meta):
+    # Legacy JPEG examples/uploads remain readable until normal seven-day expiry.
+    suffixes = ['.' + meta.get('frameFormat', 'jpg')]
+    if meta.get('scrubWidth'):
+        suffixes.append('.scrub.webp')
+    return [f'{i:04d}{suffix}' for i in range(meta['nFrames']) for suffix in suffixes]
 
 
 def install(root, source, details, slug='mlb-example', replace=False):
@@ -87,6 +97,57 @@ def remove(root, slug):
     return True
 
 
+def install_bundle(root, bundle):
+    """Install explicitly bundled clips atomically; caller holds media.lock."""
+    from hosted.video import MAX_FRAME_BYTES
+    bundle = Path(bundle)
+    entries = json.loads((bundle / 'manifest.json').read_text())
+    installed = []
+    for entry in entries:
+        slug = entry['slug']
+        folder = directory(root, slug)
+        source = bundle / f'{slug}.mp4'
+        if source.is_symlink() or not source.is_file():
+            raise ValueError(f'Missing bundled example: {slug}')
+        with source.open('rb') as handle:
+            digest = hashlib.file_digest(handle, 'sha256').hexdigest()
+        if digest != entry['sha256']:
+            raise ValueError(f'Bundled example checksum mismatch: {slug}')
+        identity = hashlib.sha256(json.dumps(entry, sort_keys=True).encode()).hexdigest()
+        marker = folder / '.bundle-sha256'
+        if folder.exists():
+            if not marker.is_file() or marker.read_text() != identity:
+                raise ValueError(f'Example {slug} already exists with different content.')
+            _, meta = describe(root, slug)
+            required = ['source.mp4'] + frameNames(meta)
+            if any(not (folder / name).is_file() for name in required):
+                raise ValueError(f'Installed example is incomplete: {slug}')
+            if meta.get('frameFormat') == 'webp' and meta.get('scrubWidth'):
+                continue
+            # Upgrade only the shared template. Existing visitors keep immutable
+            # JPEG hardlinks and expire normally; new visitors receive WebP.
+        if shutil.disk_usage(root).free < source.stat().st_size + MAX_FRAME_BYTES + 1024**3:
+            raise ValueError('Not enough disk space to install the bundled examples.')
+        folder.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        # Stage on the data filesystem so publication is a single atomic rename.
+        # A failed deployment can retry without exposing a partially decoded clip.
+        with tempfile.TemporaryDirectory(prefix='.example-install-', dir=root) as temporary:
+            install(temporary, source, entry['details'], slug)
+            staged = directory(temporary, slug)
+            (staged / '.bundle-sha256').write_text(identity)
+            previous = Path(temporary) / 'previous'
+            if folder.exists():
+                folder.rename(previous)
+            try:
+                staged.rename(folder)
+            except Exception:
+                if previous.exists():
+                    previous.rename(folder)
+                raise
+        installed.append(slug)
+    return installed
+
+
 def link(source, destination):
     """Hard link where the filesystem allows it; copy where it does not."""
     try:
@@ -94,11 +155,6 @@ def link(source, destination):
     except (OSError, NotImplementedError):
         shutil.copyfile(source, destination)
         os.chmod(destination, 0o600)
-
-
-def existing(pitches, slug):
-    """The visitor's own live clone of this example, if retention has kept it."""
-    return next((p for p in pitches if p.get('example') == slug), None)
 
 
 def clone(db, root, owner, slug, guest=False):
@@ -109,7 +165,7 @@ def clone(db, root, owner, slug, guest=False):
     folder = Path(root) / 'videos' / video
     folder.mkdir(mode=0o700)
     try:
-        for name in ['meta.json', 'source.mp4'] + [f'{i:04d}.jpg' for i in range(meta['nFrames'])]:
+        for name in ['meta.json', 'source.mp4'] + frameNames(meta):
             path = source / name
             if not path.is_file():
                 raise ValueError('The installed example is incomplete. Reinstall it.')

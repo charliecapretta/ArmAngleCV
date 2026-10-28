@@ -16,6 +16,7 @@ import uuid
 from werkzeug.security import generate_password_hash
 from hosted.app import cleanup, connect, initialize, media_lock
 from hosted import example
+from hosted.backups import KEEP_DAYS
 from hosted.video import MAX_FRAMES
 
 
@@ -33,7 +34,9 @@ def backup(root, destination):
         try:
             with destination.open('xb') as output:
                 os.chmod(destination, 0o600)
-                with tarfile.open(fileobj=output, mode='w:gz') as archive:
+                # Practice copies share inodes. Store regular files so restore's
+                # intentional rejection of archive links still permits recovery.
+                with tarfile.open(fileobj=output, mode='w:gz', dereference=True) as archive:
                     archive.add(snapshot, arcname='app.sqlite3')
                     for video in videos:
                         archive.add(Path(root) / 'videos' / video, arcname='videos/' + video)
@@ -76,16 +79,22 @@ def restore(archive_path, destination):
                 original = metadata.get('original')
                 if original is None:
                     required.append(directory / 'source.mp4')
-                else:
+                elif not isinstance(original, dict) or original.get('kind') != 'discarded':
                     if not isinstance(original, dict) or original.get('kind') != 's3' or 's3_objects' not in tables:
                         raise ValueError('Backup has invalid S3 original metadata.')
                     obj = db.execute("SELECT * FROM s3_objects WHERE video=? AND state='active'", (video['id'],)).fetchone()
                     if obj is None or any(original.get(k) != obj[k] for k in ('bucket','key','region','version')):
                         raise ValueError('Backup is missing its S3 original reference.')
-                required += [directory / f'{i:04d}.jpg' for i in range(count)]
+                from hosted.example import frameNames
+                if metadata.get('frameFormat', 'jpg') not in ('jpg', 'webp'):
+                    raise ValueError('Backup has invalid frame format.')
+                required += [directory / name for name in frameNames(metadata)]
                 if any(not path.is_file() or path.stat().st_size == 0 for path in required):
                     raise ValueError('Backup is missing video or frame files.')
         initialize(root)
+        # Recovery must never silently resurrect a session deleted after the
+        # snapshot. Startup refuses this directory until reconciliation passes.
+        (root / 'restore.pending').touch(mode=0o600)
     except Exception:
         shutil.rmtree(root)
         raise
@@ -100,6 +109,10 @@ def main():
     revoke = commands.add_parser('revoke', help='Disable sign-in and invalidate sessions')
     revoke.add_argument('username')
     commands.add_parser('cleanup')
+    uploads = commands.add_parser('uploads', help='Pause or resume new uploads without restarting the server')
+    uploads.add_argument('action', choices=('pause', 'resume', 'status'))
+    bundled = commands.add_parser('examples-install', help='Install examples from a deployment bundle')
+    bundled.add_argument('bundle')
     practice = commands.add_parser('example', help='Install, list or remove the shared practice clip')
     practice.add_argument('action', choices=('install', 'list', 'remove'))
     practice.add_argument('video', nargs='?', help='MP4 to install')
@@ -113,15 +126,43 @@ def main():
     practice.add_argument('--replace', action='store_true')
     save = commands.add_parser('backup')
     save.add_argument('destination')
+    remote_save = commands.add_parser('backup-s3', help='Send an encrypted snapshot to a private backup bucket')
+    remote_save.add_argument('--bucket', required=True)
+    remote_save.add_argument('--region', required=True)
+    remote_save.add_argument('--keep-days', type=int, default=KEEP_DAYS,
+                             help='Delete snapshots older than this after the new one is verified')
+    prune = commands.add_parser('backup-prune', help='Delete snapshots past the published retention window')
+    prune.add_argument('--bucket', required=True)
+    prune.add_argument('--region', required=True)
+    prune.add_argument('--keep-days', type=int, default=KEEP_DAYS)
     load = commands.add_parser('restore')
     load.add_argument('archive')
+    reconcile = commands.add_parser('restore-reconcile', help='Check a quarantined restore against current independent deletion records')
+    source = reconcile.add_mutually_exclusive_group(required=True)
+    source.add_argument('--current-data', help='Stopped live data directory, not a snapshot')
+    source.add_argument('--bucket', help='Independent S3 deletion ledger bucket')
+    source.add_argument('--discard-sessions', action='store_true', help='Discard recovered sessions when no trustworthy ledger survives')
+    reconcile.add_argument('--region', default='')
     args = parser.parse_args()
     if args.command == 'restore':
         restore(args.archive, args.data)
-        print('Restored. Keep the same ARMANGLE_SECRET, then start the server with this data directory.')
+        print('Restored offline. Stop the old service, then run restore-reconcile with current independent deletion records before startup.')
+        return
+    if args.command == 'restore-reconcile':
+        from hosted.deletions import reconcile
+        reconcile(args.data, current_data=args.current_data, bucket=args.bucket or '', region=args.region,
+                  discard=args.discard_sessions)
+        print('Deletion records reconciled and expired sessions removed. The restored directory can now be served.')
         return
     initialize(args.data)
-    if args.command == 'user':
+    if args.command == 'uploads':
+        marker = Path(args.data) / 'uploads.paused'
+        if args.action == 'pause':
+            marker.touch(mode=0o600, exist_ok=True)
+        elif args.action == 'resume':
+            marker.unlink(missing_ok=True)
+        print('New uploads are paused.' if marker.exists() else 'New uploads are enabled.')
+    elif args.command == 'user':
         username = args.username.strip().lower()
         if not re.fullmatch(r'[a-z0-9._-]{3,64}', username):
             raise SystemExit('Use 3–64 letters, numbers, periods, underscores or hyphens.')
@@ -137,6 +178,10 @@ def main():
             result = db.execute('UPDATE users SET password=?, version=version+1 WHERE username=?',
                                (generate_password_hash(secrets.token_urlsafe(48), method='pbkdf2:sha256:600000'), args.username.lower()))
         print('Account revoked.' if result.rowcount else 'Account not found.')
+    elif args.command == 'examples-install':
+        with media_lock(args.data):
+            installed = example.install_bundle(args.data, args.bundle)
+        print(f'Installed {len(installed)} bundled examples; matching existing examples were kept.')
     elif args.command == 'example':
         if args.action == 'list':
             for slug in example.available(args.data):
@@ -164,11 +209,27 @@ def main():
         print('Confirm you may redistribute this footage before serving it publicly.')
     elif args.command == 'cleanup':
         with media_lock(args.data):
-            cleanup(args.data)
+            pending = cleanup(args.data)
+        if pending:
+            raise SystemExit(f'{pending} remote objects still await deletion; cleanup must be retried.')
         print('Expired and orphaned data removed.')
     elif args.command == 'backup':
         backup(args.data, args.destination)
         print('Backup created. Copy it off the instance privately; remove backups after 7 days.')
+    elif args.command == 'backup-s3':
+        from hosted.backups import upload_backup
+        result = upload_backup(args.data, args.bucket, args.region, args.keep_days)
+        # Print the key and digest first: they must be recorded even when
+        # pruning fails, and the non-zero exit is what the timer reports.
+        print(json.dumps(result))
+        if result['pruned'].get('failed') or result['pruned'].get('error'):
+            raise SystemExit('Snapshot stored, but retention pruning did not complete.')
+    elif args.command == 'backup-prune':
+        from hosted.backups import prune_backups
+        result = prune_backups(args.bucket, args.region, args.keep_days)
+        print(json.dumps(result))
+        if result['failed']:
+            raise SystemExit('Some snapshots past the retention window were not deleted.')
 
 
 if __name__ == '__main__':

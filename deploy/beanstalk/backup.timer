@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily Arm Angle private backup
+
+[Timer]
+OnCalendar=daily
+RandomizedDelaySec=15m
+Persistent=true
+Unit=armangle-backup.service
+
+[Install]
+WantedBy=timers.target

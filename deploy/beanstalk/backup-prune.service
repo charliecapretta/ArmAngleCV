@@ -1,0 +1,13 @@
+[Unit]
+Description=Expire private Arm Angle snapshots independently of backup success
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=webapp
+Group=webapp
+UMask=0077
+EnvironmentFile=/etc/armangle-backup.env
+ExecStart=/usr/local/libexec/armangle-manage backup-prune --bucket ${ARMANGLE_BACKUP_BUCKET} --region ${ARMANGLE_BACKUP_REGION}
+TimeoutStartSec=1800

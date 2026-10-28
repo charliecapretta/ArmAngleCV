@@ -67,3 +67,6 @@ uploads/
 *.sqlite3-wal
 *.sqlite3-shm
 *.tar.gz
+
+# Source snapshot archives of this repo. Rebuild from git instead.
+*.zip

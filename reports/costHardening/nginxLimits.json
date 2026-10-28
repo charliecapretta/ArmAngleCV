@@ -1,0 +1,28 @@
+{
+  "/api/frame": {
+    "requests": 240,
+    "ok": 122,
+    "limited": 118
+  },
+  "/api/upload": {
+    "requests": 12,
+    "ok": 3,
+    "limited": 9
+  },
+  "/api/predict-angle": {
+    "requests": 30,
+    "ok": 7,
+    "limited": 23
+  },
+  "/api/pitches": {
+    "requests": 80,
+    "ok": 22,
+    "limited": 58
+  },
+  "normalPlayback": {
+    "requests": 180,
+    "fps": 60,
+    "limited": 0
+  },
+  "oversizeWithoutSendingBody": 413
+}

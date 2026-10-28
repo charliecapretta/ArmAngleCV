@@ -10,7 +10,7 @@ created until a successful upload; orphan guest rows are removed during cleanup.
 
 Anonymous uploads allow 10 preparation attempts per browser per hour and 30 per
 client IP per hour (including invalid media). Changing cookies does not bypass the
-IP budget. The 500 MB per-browser and 5 GB global storage ceilings and single decoder
+IP budget. The 1 GB per-browser and 5 GB global storage ceilings and single decoder
 remain enforced. Browser limits are not a durable per-person quota: visitors can clear
 cookies. Verify trusted client-IP forwarding before public sharing; otherwise users
 may share one proxy's limit. Existing account records remain separate and inaccessible
@@ -112,7 +112,7 @@ References:
 The ZIP has `application.py`, `Procfile`, `requirements.txt`, `gunicorn.conf.py`, `.platform`
 and `.ebextensions` at its root, with no enclosing project folder. Python dependencies include
 Flask, Gunicorn and headless OpenCV. The entry point is `application:application` on loopback
-port 8000, one worker and four request threads. The nginx extension permits 50 MiB uploads
+port 8000, one worker and four request threads. The nginx extension permits 200 MiB uploads
 and longer receive/processing timeouts. The platform hooks create the private data directory,
 install hourly expiry cleanup, and apply memory limits to Beanstalk's `web.service`.
 Do not manually install the Lightsail Caddy or `armangle.service` on this environment.
@@ -138,9 +138,34 @@ Passwords are prompted without echo. Share each tester's credentials privately. 
 account with `sudo -u webapp /usr/local/libexec/armangle-manage revoke friendname`.
 The app has no automatic shared/demo account and no public registration.
 
-## The practice clip
+## The five practice pitches
 
-The first-run page offers "Try an MLB example" only when a practice clip is installed.
+The `armangle-beanstalk-60s-5pitches-20260919.zip` bundle includes five local
+MLB UI practice MP4s sampled across arm angles and their pitcher, throwing-hand, park
+and Statcast-angle fields. It also fixes the browser upload limit to match the server's 200 MB limit.
+Its post-deployment hook installs them sequentially into `/var/lib/armangle/examples`
+using the deployed interpreter as `webapp`. No download or manual installation is
+needed. The first deployment takes longer while frames are decoded. Later deployments
+verify the bundled checksums and skip matching installed examples. Examples use local
+disk outside the visitor/global upload quotas and are not stored in S3 or expired.
+The hook checks for enough free space before each clip and publishes only complete
+examples. Existing visitor annotations are not changed. "Try 5 MLB pitches" opens
+five distinct private practice pitches, with named buttons and the pitch selector
+for switching between them. Returning reuses those pitches and their saved work.
+Visitors with one existing example keep it and receive four additional clips.
+Each clip has its own CSV export. No duplicate copies are created on reopening.
+
+To rebuild this bundle explicitly:
+
+```sh
+.venv/bin/python tools/prepareBeanstalk.py --include-examples --example-count 5 --out release/NEW-NAME.zip
+```
+
+Omit `--example-count` to include all 12 clips. Previously installed examples are retained;
+deploying a smaller bundle does not delete them. Without `--include-examples`, builds remain code-only. The instructions below are for
+manual installation or adding further clips.
+
+The first-run page offers MLB practice only when a practice clip is installed.
 Without one, a visitor with no MP4 of their own has nothing to open, so the tile stays
 hidden. Install a clip by copying an MP4 to the instance and running:
 
@@ -149,13 +174,19 @@ sudo -u webapp /usr/local/libexec/armangle-manage example install /tmp/clip.mp4 
   --pitcher 'Scherzer, Max' --throws R --park TOR --angle 38.2
 ```
 
-`--meta pitch.json` reads the same fields from a `uiTestBatch.json` entry instead. The
-clip is prepared once into `/var/lib/armangle/examples/`, outside the per-visitor
-`videos/` tree, and the seven-day cleanup never removes it. Each visitor who opens the
-example gets a pitch of their own whose frames are hard links to that one copy: their
-annotations, exports and deletions stay private, the clone costs no additional disk and
-no storage quota, and retention expires the clone rather than the clip. `example list`
-and `example remove` show and withdraw it; `example install --replace` swaps in another.
+`--meta pitch.json` reads the same fields from a `uiTestBatch.json` entry instead, and
+`--slug` names the clip; without it the name is `mlb-example`. Install several, under
+different slugs, to cover a range of arm slots.
+
+Each clip is prepared once into `/var/lib/armangle/examples/`, outside the per-visitor
+`videos/` tree, and the seven-day cleanup never removes it. A visitor who opens the
+example draws one installed clip at random and keeps it: reopening returns the pitch
+they have already worked on rather than drawing again. Their copy is a pitch of their
+own whose frames are hard links to the shared one, so annotations, exports and deletions
+stay private, the clone costs no additional disk and no storage quota, and retention
+expires the clone rather than the clip. `example list` and `example remove --slug` show
+and withdraw them; `example install --replace` rebuilds one in place. Budget about 65 MB
+of prepared frames per clip.
 
 `--angle` is the Statcast arm angle. The review step reveals it once all five points are
 placed, so the practice run ends in a comparison against a known answer. Uploads have no
@@ -163,7 +194,7 @@ such reference and still show none.
 
 Serving a clip here publishes it to every visitor, which is not what the downloader in
 `fetchUiTestBatch.py` retrieves footage for. Confirm you may redistribute a clip before
-installing it, and remove it with `example remove` if that changes.
+installing it, and remove it with `example remove --slug` if that changes.
 
 Check health and expiry:
 
@@ -203,10 +234,10 @@ sudo -u webapp /usr/local/libexec/armangle-manage backup /var/backups/armangle/b
 Use new filenames. Backups include private data; retain at most 7 days. Test restoration into
 a new directory before relying on backups. Never put backup files in the application ZIP.
 
-Upload limits: 50 MB, 30 seconds, 1080p, 60 fps, 1,800 frames; one preparation at a time. Per-browser storage
-is 500 MB including JPEGs and S3 originals; global video storage is 5 GB. Keep at least
-1 GB of free disk. Each upload reserves 450 MB for up to 50 MB of video plus 400 MB of
-prepared JPEGs; complex clips can hit the JPEG cap and need trimming. Frames retain
+Upload limits: 200 MB, 60 seconds, 1080p, 60 fps, 3,600 frames; one preparation at a time. Per-browser storage
+is 1 GB including JPEGs and S3 originals; global video storage is 5 GB. Keep at least
+1 GB of free disk. Each upload reserves its declared source size plus 800 MB of
+prepared JPEGs (up to 1,000 MB); complex clips can hit the JPEG cap and need trimming. Frames retain
 the uploaded resolution and frame rate. Decoder deadline remains 90 seconds.
 Videos and annotations expire together after 7 days. Service memory limit: 700 MB. Measure
 on your actual instance before inviting 3–5 friends; a credit-eligible small instance is not

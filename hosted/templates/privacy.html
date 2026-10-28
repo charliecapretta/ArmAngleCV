@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Privacy &amp; data · Arm Angle CV</title><link rel="stylesheet" href="/workspace.css"></head>
+<body><main class="landing">
+<a href="/analyze.html">← Pitch analysis</a>
+<h1>Privacy &amp; your data</h1>
+<p>Uploading sends your video to the server for processing and storage. The app stores prepared frames, session and pitcher names you enter, selected points, and saved estimates. Upload only footage you have permission to use, and avoid entering unnecessary personal information.</p>
+{% if retain_originals %}<p>This deployment retains original MP4 files, including any audio and embedded metadata, until session deletion or expiry.</p>{% else %}<p>Original MP4 files, including their audio and embedded metadata, are discarded after successful processing. Prepared images and your saved annotations remain until deletion or expiry.</p>{% endif %}
+<p>Stored data is processed by the hosting provider and can be accessed by authorized service operators for maintenance and support. It is not end-to-end encrypted. This service is a limited beta; export results because server failures may cause loss of saved work.</p>
+<h2>Access and cookies</h2>
+{% if anonymous %}<p>A session cookie links saved work to this browser. Clearing cookies or switching devices starts a different workspace; there is no account recovery. Anyone using this browser session may access its saved work.</p>{% else %}<p>A session cookie keeps you signed in and links your work to your invited account. Sign out on shared devices.</p>{% endif %}
+<p>The application uses session cookies to provide access and protect requests. In anonymous mode it stores a keyed hash of the network address to limit uploads. Hosting services may also keep operational request logs.</p>
+<h2>Retention and deletion</h2>
+<p>Videos and their saved annotations expire seven days after creation. Expired work is unavailable; hourly cleanup is scheduled to remove stored files. Use My uploads or My account to delete a session early, or delete all uploads and end this browser session. Failed file deletion is retried; outages can delay physical removal.</p>
+<p>Where backups are enabled, deleting a session removes it from the live service but does not rewrite existing snapshots. Backup copies are scheduled for deletion after seven days; outages can delay removal. Independent records containing only deleted session IDs prevent deleted sessions from being reopened during recovery.</p>
+<p>New video frame responses tell browsers not to store them. Frames downloaded under earlier versions may remain in the browser cache until cleared. Downloaded CSVs, screenshots, saved images, and other copies on your device are outside server deletion. On a shared device, use Delete all uploads and end session, then close open analysis tabs.</p>
+<p>Export your CSV to keep results. The current analysis workflow does not add your uploads or annotations to the model's training dataset.</p>
+<h2>Estimates</h2>
+<p>Estimated arm angle from an MLB-trained model. Accuracy on college footage has not been established. Results depend on camera position, release-frame selection, and point placement.</p>
+{% if support_email %}<h2>Contact</h2><p>For support or privacy requests, email <a href="mailto:{{ support_email }}">{{ support_email }}</a>. Do not email passwords or private videos.</p>{% endif %}
+</main></body></html>

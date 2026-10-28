@@ -1,0 +1,11 @@
+{
+  "totalBytes": 748943366,
+  "requestCount": 3876,
+  "frameBytes": 374407414,
+  "frameRequests": 1925,
+  "reloadBodyDownloads": 1925,
+  "reload304s": 0,
+  "firstPassBytes": 374535952,
+  "averageFrameBytes": 194497.36,
+  "pitchCount": 5
+}

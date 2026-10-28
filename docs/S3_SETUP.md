@@ -2,8 +2,11 @@
 
 Prepared locally; requires a real bucket and instance-role permissions before use.
 This is server-mediated upload, not presigned direct browser upload. The existing
-file picker and progress bar work unchanged. S3 is optional: without the two settings
-below, uploads keep their original file locally as before.
+file picker and progress bar work unchanged. New uploads discard originals by default.
+Set `ARMANGLE_RETAIN_ORIGINALS=on` to enable the optional original storage described
+here; without S3 settings that opt-in keeps originals locally. See
+[Privacy and storage](PRIVACY_STORAGE.md) for deletion ledgers, backup/prune IAM,
+and mandatory restore reconciliation.
 
 ## What moves to S3
 
@@ -14,18 +17,36 @@ removed. No user filename, pitcher name, public ACL, or credentials are sent in 
 object metadata. SSE-S3 encryption and a SHA-256 metadata digest are set on each PUT.
 The application never sends bucket names or S3 keys to browsers.
 
-JPEG frames, metadata, SQLite ownership and annotations remain local. The same
+Prepared frames, metadata, SQLite ownership and annotations remain local. The same
 signed browser-cookie ownership checks protect frames, edits, predictions and exports.
 Existing local videos are not migrated automatically. Original objects alone cannot
 restore a workspace if Beanstalk replaces the instance; local database/frame backups
 are still required. This is deliberately a small storage change, not a multi-instance
 or persistent-database migration.
 
-Supported uploads: MP4, up to 50 MB, 30 seconds, 1920 × 1080, 60 fps and 1,800 frames.
+Supported uploads: MP4, up to 200 MB, 60 seconds, 1920 × 1080, 60 fps and 3,600 frames.
 The decoder preserves resolution/frame rate, writes frames sequentially, and stops at
-90 seconds or 400 MB of JPEGs. The app reserves 450 MB before processing, still enforces
-500 MB per browser / 5 GB global stored-video quotas, and leaves 1 GB free locally.
+90 seconds or 800 MB of prepared frames. The app reserves the declared original size plus 800 MB
+for frames (up to 1,000 MB), enforces 1 GB per browser / 5 GB global stored-video quotas,
+and leaves 1 GB free locally. Quotas include originals even after they move to S3.
+Sizes labeled MB/GB in the app use binary units (MiB/GiB).
 On a 1 GB instance, test real clips before broad sharing; S3 does not offload decoding.
+
+The 200 MB update keeps the existing browser → Beanstalk → S3 flow. The browser
+allows 15 minutes for upload and processing; this does not override CloudFront or
+proxy timeouts. Beanstalk nginx accepts 200 MiB files plus 64 KiB multipart overhead and may buffer another copy
+on its own temporary disk. Check both the nginx temporary volume and application
+volume during a real 200 MB upload. Caddy's alternative deployment permits ten
+minutes for receiving the body. A full 200 MiB upload takes about 168 seconds at
+10 Mbps or 84 seconds at 20 Mbps before processing, ignoring network overhead.
+The decoder still has a 90-second deadline and the app still prepares one clip at
+a time. Direct-to-S3 uploads and a persisted processing queue are not implemented.
+
+The larger byte limit does not change the configured instance size or base hourly
+price. Frame extraction and angle prediction run on the server; the browser displays
+frames and collects points. S3 stores original bytes. More actual usage can increase
+storage, requests, delivery traffic and (on applicable burstable EC2 instances)
+surplus CPU charges. The 5 GiB global video quota remains unchanged.
 
 ## 1. Create a dedicated bucket
 

@@ -2,7 +2,7 @@
     servers {
         timeouts {
             read_header 10s
-            read_body 120s
+            read_body 600s
             idle 60s
         }
     }
@@ -11,7 +11,7 @@
 # Replace with a hostname whose DNS points to the instance's static IP.
 YOUR_DOMAIN {
     request_body {
-        max_size 52428800
+        max_size 209780736
     }
     header Strict-Transport-Security "max-age=31536000"
     reverse_proxy 127.0.0.1:8778 {

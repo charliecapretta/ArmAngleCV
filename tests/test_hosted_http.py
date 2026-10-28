@@ -168,14 +168,22 @@ class HostedHTTPTest(unittest.TestCase):
                 for i in range(12):
                     writer.write(np.full((180,320,3),i*10,dtype=np.uint8))
                 writer.release()
-                status, _, body = alice.request('/api/upload?filename=test.mp4&sessionName=HTTP-test',fixture.read_bytes(),{'Content-Type':'video/mp4'})
+                boundary = 'armangle-http-test-boundary'
+                multipart = (
+                    f'--{boundary}\r\nContent-Disposition: form-data; name="sessionName"\r\n\r\nHTTP-test\r\n'
+                    f'--{boundary}\r\nContent-Disposition: form-data; name="video"; filename="test.mp4"\r\n'
+                    'Content-Type: video/mp4\r\n\r\n'
+                ).encode() + fixture.read_bytes() + f'\r\n--{boundary}--\r\n'.encode()
+                status, _, body = alice.request('/api/upload', multipart,
+                                               {'Content-Type': 'multipart/form-data; boundary=' + boundary})
                 self.assertEqual(status,200,body)
                 pitch = json.loads(body)['pitch']
                 self.assertEqual(bob.request('/api/frame?dir='+pitch['dirName'])[0],404)
                 status, headers, body = alice.request('/api/frame?dir='+pitch['dirName']+'&frame=2')
                 self.assertEqual(status,200)
-                self.assertEqual(headers['Content-Type'],'image/jpeg')
-                self.assertTrue(body.startswith(b'\xff\xd8'))
+                self.assertEqual(headers['Content-Type'],'image/webp')
+                self.assertIn('no-store', headers['Cache-Control'])
+                self.assertTrue(body.startswith(b'RIFF') and body[8:12] == b'WEBP')
                 row = dict(game_pk='local',play_id=pitch['playId'],frame_index=2,status='labeled',workspace='analysis',
                            shoulder_x=120,shoulder_y=100,off_shoulder_x=150,off_shoulder_y=100,
                            elbow_x=100,elbow_y=70,wrist_x=80,wrist_y=40,ball_x=60,ball_y=20)

@@ -9,7 +9,8 @@ const csrfToken = () => HOSTED ? document.querySelector('meta[name="csrf-token"]
 const state = {
   pitches: [], sessionFilter: "", exporting: false, index: 0, current: null, labels: new Map(), history: [], drafts: new Map(),
   frame: 0, img: null, imgCache: new Map(), points: {}, origin: {}, mode: "release",
-  zoom: false, zoomView: null, drag: null, active: null, placingPoint: false, ballOccluded: false,
+  zoom: false, zoomView: null, pan: null, zoomHinted: false,
+  drag: null, active: null, placingPoint: false, ballOccluded: false,
   loading: false, busy: false, poseBusy: false, playing: false, playToken: 0,
   reviewing: false, predictedAngle: null, predictionBusy: false,
   releaseQuality: "unreviewed", pointQuality: "unreviewed", predictionToken: 0,
@@ -18,7 +19,7 @@ const state = {
 const POINTS = ["shoulder", "offShoulder", "elbow", "wrist", "ball"];
 const POSE_POINTS = POINTS.slice(0, 4);
 const POINT_COLOR = { shoulder:"#ffd166", offShoulder:"#f78c6b", elbow:"#ef476f", wrist:"#06d6a0", ball:"#ff6ec7" };
-const POINT_LABEL = { shoulder:"throwing shoulder", offShoulder:"off shoulder", elbow:"elbow", wrist:"wrist", ball:"ball" };
+const POINT_LABEL = { shoulder:"throwing shoulder", offShoulder:"glove side shoulder", elbow:"elbow", wrist:"wrist", ball:"ball" };
 const PREFIX = { shoulder:"shoulder", offShoulder:"off_shoulder", elbow:"elbow", wrist:"wrist", ball:"ball" };
 const el = id => document.getElementById(id);
 const canvas = el("stage"), ctx = canvas.getContext("2d");
@@ -26,7 +27,12 @@ const keyOf = pitch => `${pitch.gamePk}_${pitch.playId}`;
 const blocked = () => state.busy || state.loading;
 // Uploads have no reference angle; the practice clip does, and comparing
 // against it is the reason to offer one. Training always sees the reference.
-const showsReference = () => !ANALYSIS || !!state.current?.example;
+const showsReference = () => !ANALYSIS || !!state.current?.example || !!state.current?.uiTestBatch;
+// On the analysis MLB clips the published angle is the number worth reading
+// first, so it takes the headline card and the measured angle moves to the
+// secondary row. Uploads have no reference, and training must not headline the
+// truth while points are still being judged, so both keep the original order.
+const referenceLeads = () => ANALYSIS && (!!state.current?.example || !!state.current?.uiTestBatch);
 const hasValue = value => value !== "" && value != null && Number.isFinite(Number(value));
 const hasPoint = (row, name) => hasValue(row?.[`${PREFIX[name]}_x`]) && hasValue(row?.[`${PREFIX[name]}_y`]);
 function isComplete(row) {
@@ -54,7 +60,8 @@ async function request(url, body) {
 function clearPoints() {
   state.pointQuality = "unreviewed"; clearPrediction();
   state.points = {}; state.origin = {}; state.active = null; state.drag = null;
-  state.placingPoint = false; state.ballOccluded = false; state.pickingPitcher = false; state.zoomView = null;
+  state.placingPoint = false; state.ballOccluded = false; state.pickingPitcher = false;
+  state.zoomView = null; state.pan = null;
   el("seedWarn").hidden = true;
 }
 function nextEmptyPoint() {
@@ -75,6 +82,7 @@ function timeAt(frame) {
 function initialFrame(pitch, saved) {
   if (hasValue(saved?.frame_index)) return Number(saved.frame_index);
   if (pitch.isLocal) return pitch.startFrame || 0;
+  if (ANALYSIS || pitch.example || pitch.uiTestBatch) return 180;
   // Compare seconds, not raw frame indices from different frame rates.
   const seconds = state.pitches.filter(p => !p.isLocal).flatMap(p => {
     const row = state.labels.get(keyOf(p));
@@ -116,6 +124,16 @@ function renderQueue() {
     option.selected = p === state.current; el("pitchSelect").append(option);
   }
 }
+function nextAnalysisPitch() {
+  const order = [...state.pitches.slice(state.index+1), ...state.pitches.slice(0,state.index)];
+  const queue = visiblePitches();
+  return order.find(p => queue.includes(p) && !isComplete(state.labels.get(keyOf(p))));
+}
+async function continueAnalysis() {
+  if (blocked() || state.dirty) return;
+  const next = nextAnalysisPitch();
+  if (next) await showPitch(state.pitches.indexOf(next));
+}
 function renderWorkflow() {
   const points = state.mode === "points", review = points && state.reviewing, locked = blocked();
   const savedReview = ANALYSIS && review && !state.dirty && isComplete(state.labels.get(keyOf(state.current || {})));
@@ -131,9 +149,14 @@ function renderWorkflow() {
   el("stepTitle").textContent = review ? (ANALYSIS ? "Your angle estimate" : "Review & save") : points ? "Mark five points" : "Choose the release";
   el("stepHelp").textContent = review
     ? (ANALYSIS ? "Review the estimate and your marked frame. Save when you’re ready." : "Check the points on the image, then save this pitch to the training dataset.")
-    : points ? "Click each point on the image. Drag any point to adjust it, or select its name to place it again."
+    : points ? "Click each landmark in order. Select a name to replace a point; once all points are placed, drag to adjust."
     : "Use the timeline and neighboring frames to choose the closest available release. An exact, clean frame is not required.";
-  if (savedReview) { el("stepTitle").textContent = "Pitch saved"; el("stepHelp").textContent = "Export this session as CSV, or add another pitch from this video."; }
+  if (savedReview) {
+    el("stepTitle").textContent = "Pitch saved";
+    el("stepHelp").textContent = state.current?.example || state.current?.uiTestBatch
+      ? "Continue to the next example, or export this pitch as CSV."
+      : "Export this session as CSV, or add another pitch from this video.";
+  }
   el("releaseActions").hidden = points; el("pointActions").hidden = !points || review;
   el("pointButtons").hidden = !points || review; el("occludedLabel").hidden = !points || review;
   el("reviewActions").hidden = !review;
@@ -156,13 +179,27 @@ function renderWorkflow() {
   el("playSpeed").disabled = locked || points;
   el("playPause").textContent = state.playing ? "Pause" : "Play";
   el("undoSave").disabled = locked || !state.history.length;
-  el("newLocalPitch").hidden = !ANALYSIS || !state.current?.isLocal;
+  el("newLocalPitch").hidden = !ANALYSIS || !state.current?.isLocal || !!state.current?.example;
   el("newLocalPitch").disabled = locked || state.dirty || !state.labels.has(keyOf(state.current || {}));
   el("truthDetails").hidden = !showsReference() || !review;
   if (!showsReference() || !review) { el("sanityWarn").hidden = true; el("pDelta").textContent = "—"; }
   el("resultCard").hidden = !ANALYSIS;
   el("predictAngle").hidden = !ANALYSIS;
   el("savePoints").textContent = ANALYSIS ? "Save analysis" : "Save & next pitch →";
+  el("savePoints").hidden = savedReview;
+  const next = savedReview ? nextAnalysisPitch() : null;
+  el("nextReviewPitch").hidden = !savedReview || !next;
+  el("nextReviewPitch").disabled = locked;
+  el("nextReviewPitch").textContent = `Next pitch →${next?.pitcherName ? ` ${next.pitcherName}` : ""}`;
+  el("reviewSaved").hidden = !savedReview;
+  el("reviewSaved").textContent = next ? "Saved. Ready for the next pitch." : "Saved. All pitches in this queue are complete.";
+  const practice = !!state.current?.example || !!state.current?.uiTestBatch;
+  if (savedReview && !next && practice) el("stepHelp").textContent = "All examples in this queue are complete. Export this pitch as CSV, or choose another pitch to review.";
+  el("workspaceBadge").textContent = ANALYSIS ? (practice ? "MLB PRACTICE" : "YOUR FOOTAGE") : "DATASET WORKSPACE";
+  const exportLabel = practice ? "Export pitch CSV" : "Export session CSV";
+  el("exportSession").textContent = el("downloadResult").textContent = exportLabel;
+  el("confirmRelease").textContent = ANALYSIS ? "Use this release frame →" : "Use this frame →";
+  el("practiceComparison").hidden = !ANALYSIS || !practice || !review;
   if (ANALYSIS && review && !state.ballOccluded && (state.predictionBusy || state.predictedAngle == null)) el("savePoints").disabled = true;
   el("predictAngle").disabled = locked || state.poseBusy || state.predictionBusy || !points || state.ballOccluded || !POINTS.every(n => state.points[n]);
   el("downloadResult").disabled = !canExportSession();
@@ -177,20 +214,57 @@ function renderWorkflow() {
     el("frameNum").textContent = `${time == null ? "time unknown" : time.toFixed(3)+" s"} · frame ${state.frame} / ${state.current.nFrames-1}${points ? " · locked" : ""}`;
     el("viewerTitle").textContent = state.current.pitcherName || state.current.sourceName || "Pitch preview";
   }
-  el("viewerHint").textContent = review ? "Review the marked frame. Choose Adjust points to make changes." : points ? "The release frame is locked. Place all points on this same image." : "← / → step one frame · Space plays slowly · Click a thumbnail to compare.";
+  el("zoomPoints").textContent = state.zoom ? "Full frame (Z)" : "Zoom to pitcher (Z)";
+  el("viewerHint").textContent = review ? "Review the marked frame. Choose Adjust points to make changes."
+    : points ? (state.zoom
+        ? "Zoomed in · scroll to zoom · shift-drag to pan · Z for the full frame"
+        : "The release frame is locked. Place all points on this same image · scroll to zoom")
+    : "← / → step one frame · Space plays slowly · Click a thumbnail to compare.";
   renderPointButtons();
   if (review) renderReview();
 }
+
+const MEASURED_LABEL = "MEASURED SHOULDER → BALL";
+const MEASURED_NOTE = "From your marked points, relative to image horizontal. Camera perspective affects this measurement.";
+const MEASURED_MISSING_NOTE = "Mark the ball to measure this angle.";
+const REFERENCE_LABEL = "STATCAST REFERENCE";
+const REFERENCE_NOTE = "Statcast's published arm angle for this pitch, revealed only after placement. Compare it with your measured angle.";
+
+/**
+ * Fills the headline card and the secondary row. Which number goes where is
+ * `referenceLeads()`: MLB clips lead with the Statcast angle, everything else
+ * leads with what the marked points measure.
+ */
+function renderAngleCards() {
+  const measured = state.ballOccluded ? null : pixelAngle("ball");
+  const measuredText = measured == null ? "Unavailable" : `${measured.toFixed(1)}°`;
+  const measuredNote = measured == null ? MEASURED_MISSING_NOTE : MEASURED_NOTE;
+  const truth = state.current?.armAngle;
+  const truthText = truth == null ? "Unavailable" : `${Number(truth).toFixed(1)}°`;
+  const lead = referenceLeads();
+  el("reviewBallLabel").textContent = lead ? REFERENCE_LABEL : MEASURED_LABEL;
+  el("reviewBallAngle").textContent = lead ? truthText : measuredText;
+  el("reviewBallNote").textContent = lead ? REFERENCE_NOTE : measuredNote;
+  el("pTruthLabel").textContent = lead ? "Measured shoulder → ball" : "Statcast reference";
+  el("pTruth").textContent = lead ? measuredText : truthText;
+  el("pTruthNote").textContent = lead ? measuredNote : REFERENCE_NOTE;
+}
 function renderReview() {
   const time = timeAt(state.frame);
-  const measured = state.ballOccluded ? null : pixelAngle("ball");
-  el("reviewBallAngle").textContent = measured == null ? "Unavailable" : `${measured.toFixed(1)}°`;
-  el("reviewBallNote").textContent = measured == null ? "Mark the ball to measure this angle." : "From your marked points, relative to image horizontal. Camera perspective affects this measurement.";
+  renderAngleCards();
+  const comparable = !state.predictionBusy && !state.ballOccluded && hasValue(state.predictedAngle) && hasValue(state.current?.armAngle);
+  const delta = comparable ? Math.abs(state.predictedAngle - Number(state.current.armAngle)) : null;
+  el("practiceError").textContent = delta == null ? (state.predictionBusy ? "Calculating difference…" : "Comparison unavailable") : `Off by ${delta.toFixed(1)}°`;
+  el("practiceTip").textContent = delta == null
+    ? (state.predictionBusy ? "Calculating your estimate…" : "Place all five points and calculate an estimate to compare with Statcast.")
+    : delta > 15 ? "Estimate vs. Statcast. Check your release frame and landmark positions. Camera perspective can also affect the estimate."
+    : "Absolute difference between your model estimate and the Statcast reference.";
   el("reviewSummary").replaceChildren();
   for (const [label,value] of [["Release",time == null ? `Frame ${state.frame}` : `${time.toFixed(3)} s · frame ${state.frame}`],
       ["Points",state.ballOccluded ? "4 body points · ball hidden" : `${POINTS.filter(n => state.points[n]).length} of 5 placed`],
       ["Timing",{unreviewed:"Not reviewed",closest_available:"Closest available",unclear:"Unclear"}[state.releaseQuality]],
       ["Clarity",{unreviewed:"Not reviewed",reviewed:"Reviewed",uncertain:"Uncertain"}[state.pointQuality]]]) {
+    if (value === "Not reviewed") continue;
     const dt = document.createElement("dt"),dd = document.createElement("dd");dt.textContent = label;dd.textContent = value;el("reviewSummary").append(dt,dd);
   }
 }
@@ -221,8 +295,8 @@ function renderPointButtons() {
     el("pointButtons").append(button);
   }
 }
-function frameUrl(frame) {
-  return `/api/frame?dir=${encodeURIComponent(state.current.dirName)}&frame=${frame}`;
+function frameUrl(frame, size = state.mode === "release" ? "scrub" : "full") {
+  return `/api/frame?dir=${encodeURIComponent(state.current.dirName)}&frame=${frame}${HOSTED ? `&size=${size}&privacy=2` : ""}`;
 }
 function imageFor(url) {
   if (state.imgCache.has(url)) return state.imgCache.get(url);
@@ -242,9 +316,9 @@ async function loadFrame() {
     const image = await imageFor(url);
     if (token !== state.imageToken) return false;
     state.img = image; draw();
-    for (const offset of [-2,-1,1,2]) {
+    for (const offset of state.mode === "release" ? [-2,-1,1,2] : []) {
       const frame = state.frame + offset;
-      if (frame >= 0 && frame < state.current.nFrames) imageFor(frameUrl(frame)).catch(() => {});
+      if (frame >= 0 && frame < state.current.nFrames) imageFor(frameUrl(frame, "scrub")).catch(() => {});
     }
     return true;
   } catch (error) { if (token === state.imageToken) showError(error.message); return false; }
@@ -274,10 +348,7 @@ async function showPitch(index = state.index) {
     el("scrub").max = pitch.nFrames-1; el("scrub").value = state.frame;
     await loadFrame();
     el("saveState").textContent = draft ? "Unsaved changes restored" : saved ? "Saved work restored" : "Ready to choose release";
-    if (state.mode === "points" && state.img) {
-      if (POINTS.some(n => state.points[n])) fitZoom();
-
-    }
+    if (state.mode === "points" && state.img) zoomToPitcher();
     renderThumbs();
     const next = state.pitches[index+1];
     if (next && !ANALYSIS) fetch(`/api/prefetch?dir=${encodeURIComponent(next.dirName)}`).catch(() => {});
@@ -299,7 +370,7 @@ function renderThumbs() {
     if (frame < 0 || frame >= state.current.nFrames) continue;
     const figure = document.createElement("figure"), button = document.createElement("button");
     const image = document.createElement("img"), caption = document.createElement("figcaption");
-    image.src = frameUrl(frame); image.alt = `Frame ${frame}`;
+    image.src = frameUrl(frame, "scrub"); image.alt = `Frame ${frame}`;
     const delta = timeAt(frame) != null && timeAt(state.frame) != null ? Math.round((timeAt(frame)-timeAt(state.frame))*1000) : null;
     caption.textContent = `${frame} · ${offset === 0 ? "selected" : delta == null ? `${offset > 0 ? "+" : ""}${offset} frames` : `${delta > 0 ? "+" : ""}${delta} ms`}`;
     figure.className = offset === 0 ? "sel" : "";
@@ -323,7 +394,108 @@ async function togglePlay() {
   }
   if (token === state.playToken) { stopPlayback(); renderWorkflow(); }
 }
-function fitZoom() { state.zoomView = null; state.zoom = true; state.zoomView = viewTransform(); draw(); }
+/*
+ * Zoom and pan.
+ *
+ * The canvas is always the size of the source frame and `draw` paints a
+ * sub-rectangle of the image across all of it, so a view is just a rectangle
+ * in image pixels. Points are stored in image coordinates either way: zooming
+ * changes how precisely they can be clicked, never what gets saved.
+ */
+const MAX_ZOOM = 9;        // tightest view the mouse wheel will reach
+const AUTO_MAX_ZOOM = 4;   // an automatic guess stays loose enough to argue with
+const MIN_VIEW_PX = 120;   // never show fewer source pixels than this
+
+// All views, clicks, saved points and CSV coordinates stay in original pixels.
+// Only drawImage's source rectangle is scaled to the decoded bitmap resolution.
+function imageDimensions() {
+  return state.img ? {width:state.current?.imgW || state.img.width,
+                      height:state.current?.imgH || state.img.height} : null;
+}
+function fullView() {
+  const image = imageDimensions();
+  return image ? { sx:0, sy:0, sw:image.width, sh:image.height } : { sx:0, sy:0, sw:1, sh:1 };
+}
+function clampView(view) {
+  const image = imageDimensions();
+  if (!image) return fullView();
+  return { sx:Math.max(0, Math.min(view.sx, image.width - view.sw)),
+           sy:Math.max(0, Math.min(view.sy, image.height - view.sh)), sw:view.sw, sh:view.sh };
+}
+/** The view centred on a focus, keeping the frame's aspect ratio so nothing stretches. */
+function viewAround(focus, maxZoom = MAX_ZOOM) {
+  const image = imageDimensions();
+  if (!image || !focus) return fullView();
+  const aspect = image.width / image.height;
+  const tightest = Math.max(image.width / maxZoom, MIN_VIEW_PX);
+  const sw = Math.min(image.width, Math.max(focus.halfW * 2, focus.halfH * 2 * aspect, tightest));
+  const sh = sw / aspect;
+  return clampView({ sx:focus.cx - sw / 2, sy:focus.cy - sh / 2, sw, sh });
+}
+function zoomTo(focus, maxZoom = MAX_ZOOM) {
+  if (!focus || !state.img) return false;
+  state.zoom = true; state.zoomView = viewAround(focus, maxZoom);
+  draw(); renderWorkflow(); return true;
+}
+function resetZoom() { state.zoom = false; state.zoomView = null; state.pan = null; draw(); renderWorkflow(); }
+/** Scale about a fixed image point, so whatever is under the cursor stays there. */
+function zoomBy(factor, anchor) {
+  const image = imageDimensions();
+  if (!image || !factor) return;
+  const view = viewTransform(), aspect = image.width / image.height;
+  const sw = Math.min(image.width, Math.max(view.sw / factor, image.width / MAX_ZOOM, MIN_VIEW_PX));
+  if (sw >= image.width - .5) { resetZoom(); return; }
+  const sh = sw / aspect;
+  const fx = (anchor.x - view.sx) / view.sw, fy = (anchor.y - view.sy) / view.sh;
+  state.zoom = true;
+  state.zoomView = clampView({ sx:anchor.x - fx * sw, sy:anchor.y - fy * sh, sw, sh });
+  draw(); renderWorkflow();
+}
+
+/** Points already on screen. Exact, so it outranks every estimate below. */
+function placedFocus() {
+  const placed = POINTS.map(n => state.points[n]).filter(Boolean);
+  if (!placed.length) return null;
+  const xs = placed.map(p => p.x), ys = placed.map(p => p.y);
+  const span = Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
+  // Frame every placed point with room to reach the ones still missing.
+  const half = Math.max(span * .85, 110);
+  return { cx:(Math.min(...xs) + Math.max(...xs)) / 2, cy:(Math.min(...ys) + Math.max(...ys)) / 2,
+           halfW:half, halfH:half };
+}
+
+/*
+ * Where the pitcher is. Measured over the 192 labeled pitches in this
+ * repository: every shoulder and ball point sits within x 0.07-0.68 and
+ * y 0.34-0.87 of the frame, and 99% within x 0.13-0.65, y 0.37-0.81. The
+ * delivery is left of centre and low, never in the top third, in broadcast
+ * and in the side-on phone footage both. A fixed crop of that box holds the
+ * pitcher without looking at a single pixel.
+ */
+const PITCHER_CROP = { cx:.39, cy:.59, halfW:.26, halfH:.22 };   // exactly that 99% box
+function centerFocus() {
+  const image = imageDimensions();
+  if (!image) return null;
+  return { cx:image.width * PITCHER_CROP.cx, cy:image.height * PITCHER_CROP.cy,
+           halfW:image.width * PITCHER_CROP.halfW, halfH:image.height * PITCHER_CROP.halfH };
+}
+
+/**
+ * Zoom once the release frame is locked, which is the moment the work turns
+ * from watching a play into clicking joints a few pixels wide. Points already
+ * placed frame themselves exactly; otherwise the crop is where pitchers are.
+ */
+function zoomToPitcher() {
+  if (!state.img || state.mode !== "points") return;
+  if (zoomTo(placedFocus())) return;
+  zoomTo(centerFocus(), AUTO_MAX_ZOOM);
+  if (!state.zoomHinted) {
+    state.zoomHinted = true;
+    toast("Zoomed in. Scroll to adjust, shift-drag to pan, Z for the full frame.");
+  }
+}
+function fitZoom() { if (!zoomTo(placedFocus())) resetZoom(); }
+function toggleZoom() { state.zoom ? resetZoom() : zoomToPitcher(); }
 async function poseSeed({force = false} = {}) {
   if (blocked() || state.poseBusy || state.reviewing || state.mode !== "points" || !state.img) return;
   const targets = POSE_POINTS.filter(n => force || !state.points[n]);
@@ -396,8 +568,9 @@ async function confirmRelease({next = false} = {}) {
   if (next) { state.dirty = false; state.drafts.delete(keyOf(state.current)); await advance("release"); return; }
   state.mode = "points";
   if (alreadySaved && !POINTS.some(n => state.points[n])) restorePoints(saved);
+  if (!await loadFrame()) return;
   renderWorkflow(); draw();
-  if (POINTS.some(n => state.points[n])) fitZoom();
+  zoomToPitcher();
 }
 async function saveCurrent(status = "labeled") {
   if (blocked() || state.poseBusy || !state.img) return;
@@ -424,13 +597,14 @@ async function advance(stage) {
   });
   if (next) await showPitch(state.pitches.indexOf(next));
   else {
-    if (stage === "release") { state.mode = "points"; renderWorkflow(); draw(); }
+    if (stage === "release") { state.mode = "points"; await loadFrame(); renderWorkflow(); draw(); }
     toast(stage === "release" ? "All releases selected. Use “Need points” to finish labeling." : "Queue complete. Add another pitch or choose one to review.");
   }
 }
 function changeRelease() {
   if (blocked() || state.poseBusy) return;
-  clearPrediction(); state.reviewing = false; stopPlayback(); state.mode = "release"; state.zoom = false; state.zoomView = null;
+  clearPrediction(); state.reviewing = false; stopPlayback(); state.mode = "release";
+  state.zoom = false; state.zoomView = null; state.pan = null;
   state.poseToken++; state.pickingPitcher = false;
   renderWorkflow(); renderThumbs(); draw();
   toast("Changing frames clears point positions. Your saved label stays intact until you confirm.");
@@ -464,37 +638,18 @@ async function addLocalVideo(payload) {
   finally { state.busy = false; el("importSubmit").disabled = false; renderWorkflow(); }
 }
 function viewTransform() {
-  if (state.zoom && state.zoomView) return state.zoomView;
-  const image = state.img;
-  if (!image) return { sx:0, sy:0, sw:1, sh:1 };
-  const placed = POINTS.map((n) => state.points[n]).filter(Boolean);
-  if (!state.zoom || placed.length < 2) {
-    return { sx:0, sy:0, sw:image.width, sh:image.height };
-  }
-  // Frame every placed point, biased toward the wrist->ball end where the
-  // clicking is most precision-sensitive.
-  const xs = placed.map((p) => p.x), ys = placed.map((p) => p.y);
-  const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
-  const cy = (Math.min(...ys) + Math.max(...ys)) / 2;
-  const span = Math.max(Math.max(...xs) - Math.min(...xs),
-                        Math.max(...ys) - Math.min(...ys));
-  const half = Math.max(span * 0.85, 110);
-  const aspect = image.width / image.height;
-  let sw = Math.min(half * 2 * aspect, image.width);
-  let sh = Math.min(half * 2, image.height);
-  return {
-    sx: Math.max(0, Math.min(cx - sw / 2, image.width - sw)),
-    sy: Math.max(0, Math.min(cy - sh / 2, image.height - sh)),
-    sw, sh
-  };
+  return state.zoom && state.zoomView ? state.zoomView : fullView();
 }
 
 function draw() {
   const image = state.img;
   if (!image || !image.width) return;
   const view = viewTransform();
-  canvas.width = image.width; canvas.height = image.height;
-  ctx.drawImage(image, view.sx, view.sy, view.sw, view.sh, 0, 0, canvas.width, canvas.height);
+  const dimensions = imageDimensions();
+  canvas.width = dimensions.width; canvas.height = dimensions.height;
+  const scaleX = image.width / dimensions.width, scaleY = image.height / dimensions.height;
+  ctx.drawImage(image, view.sx * scaleX, view.sy * scaleY, view.sw * scaleX, view.sh * scaleY,
+                0, 0, canvas.width, canvas.height);
 
   const scale = canvas.width / view.sw;
   const toCanvas = (p) => ({ x:(p.x - view.sx) * scale, y:(p.y - view.sy) * (canvas.height / view.sh) });
@@ -608,6 +763,7 @@ function renderMeasure() {
 function renderSanity(angle, isProxy) {
   const truth = state.current && state.current.armAngle != null ? +state.current.armAngle : null;
   const box = el("sanityWarn");
+  if (ANALYSIS) { box.hidden = true; return; }
   if (!showsReference() || !state.reviewing || angle === null || truth === null) {
     el("pDelta").textContent = "—"; box.hidden = true; return;
   }
@@ -632,7 +788,6 @@ function renderMeta() {
     const dt = document.createElement("dt"), dd = document.createElement("dd");
     dt.textContent = name; dd.textContent = value; el("meta").append(dt, dd);
   }
-  el("pTruth").textContent = pitch.armAngle != null ? `${Number(pitch.armAngle).toFixed(1)}°` : "Unavailable";
 }
 
 function renderProgress() {
@@ -654,7 +809,8 @@ function canExportSession() {
     state.pitches.some(p => p.sessionId === session && state.labels.has(keyOf(p)));
 }
 function renderSession() {
-  const session = selectedSessionId(), pitches = state.pitches.filter(p => p.sessionId === session);
+  const session = selectedSessionId(), practice = ANALYSIS && el("queueFilter").value === "batch";
+  const pitches = state.pitches.filter(p => practice ? (p.example || p.uiTestBatch) : p.sessionId === session);
   el("sessionPanel").hidden = !state.pitches.length;
   el("sessionSelect").replaceChildren();
   const sessions = new Map(state.pitches.map(p => [p.sessionId, p]));
@@ -668,13 +824,14 @@ function renderSession() {
     const row = state.labels.get(keyOf(pitch)), button = document.createElement("button");
     const status = {labeled:"Labeled", occluded:"Ball unavailable", release_selected:"Release saved · needs points", skipped:"Skipped"}[row?.status] || "Needs release";
     button.className = `secondary${pitch === state.current ? " selectedPitch" : ""}`;
-    button.textContent = `Pitch ${index+1} · ${status}${hasValue(row?.frame_index) ? ` · frame ${row.frame_index}` : ""}`;
+    button.textContent = `Pitch ${index+1}${practice ? ` · ${pitch.pitcherName}` : ""} · ${status}${hasValue(row?.frame_index) ? ` · frame ${row.frame_index}` : ""}`;
     button.disabled = blocked();
     button.addEventListener("click", () => { if (!blocked()) showPitch(state.pitches.indexOf(pitch)); });
     el("sessionPitches").append(button);
   }
-  const saved = pitches.filter(p => state.labels.has(keyOf(p))).length;
-  el("sessionSummary").textContent = `${saved} saved / ${pitches.length} pitches · ${pitches[0]?.sourceName || "MLB example"}`;
+  const saved = pitches.filter(p => isComplete(state.labels.get(keyOf(p)))).length;
+  el("sessionSummary").textContent = `${saved} complete / ${pitches.length} pitches · ${practice ? "MLB practice · choose any pitch below" : pitches[0]?.sourceName || "MLB example"}`;
+  el("exportSession").textContent = practice ? "Export pitch CSV" : "Export session CSV";
   el("exportSession").disabled = !canExportSession();
 }
 async function exportSession() {
@@ -699,10 +856,11 @@ async function exportSession() {
 function sendVideo(file, metadata) {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
-    xhr.open("POST", `/api/upload?${new URLSearchParams(metadata)}`);
+    xhr.open("POST", HOSTED ? "/api/upload" : `/api/upload?${new URLSearchParams(metadata)}`);
     xhr.setRequestHeader("X-CSRF-Token", csrfToken());
-    // Hosted proxy allows 120s to receive + 100s to prepare, plus response overhead.
-    xhr.setRequestHeader("Content-Type", "video/mp4"); xhr.timeout = HOSTED ? 300000 : 180000;
+    // Allow a large upload on a slow connection, then server preparation and storage.
+    if (!HOSTED) xhr.setRequestHeader("Content-Type", "video/mp4");
+    xhr.timeout = HOSTED ? 900000 : 180000;
     xhr.upload.onprogress = event => {
       if (event.lengthComputable) el("uploadProgress").value = event.loaded / event.total * 100;
       el("uploadStatus").textContent = `Uploading… ${Math.round(el("uploadProgress").value)}%`;
@@ -717,13 +875,20 @@ function sendVideo(file, metadata) {
     };
     xhr.onerror = () => reject(new Error("Connection lost. Try the upload again."));
     xhr.ontimeout = () => reject(new Error("Upload timed out. Try a shorter clip."));
-    xhr.send(file);
+    if (HOSTED) {
+      const body = new FormData();
+      body.append("video", file, file.name);
+      for (const [key, value] of Object.entries(metadata)) {
+        if (key !== "filename") body.append(key, value);
+      }
+      xhr.send(body);
+    } else xhr.send(file);
   });
 }
 async function uploadVideo() {
   if (blocked()) return;
   const file = el("videoFile").files?.[0];
-  const maxMB = HOSTED ? 50 : 100;
+  const maxMB = HOSTED ? 200 : 100;
   if (!file || !/\.mp4$/i.test(file.name) || file.size <= 0 || file.size > maxMB * 1024 * 1024) {
     el("importError").textContent = `Choose an MP4 video no larger than ${maxMB} MB.`; el("importError").hidden = false; return;
   }
@@ -800,8 +965,19 @@ el("releaseQuality").addEventListener("change", event => { state.releaseQuality 
 el("pointQuality").addEventListener("change", event => { state.pointQuality = event.target.value; markDirty(); renderWorkflow(); });
 
 canvas.addEventListener("pointerdown", event => {
-  if (blocked() || state.poseBusy || state.reviewing || state.mode !== "points" || !state.img) return;
-  const point = eventToImage(event), handle = state.placingPoint ? null : nearestHandle(point);
+  if (blocked() || !state.img) return;
+  // Shift-drag pans instead of placing: a plain click must stay a click.
+  if (state.zoom && (event.shiftKey || event.button === 1)) {
+    const view = viewTransform(), rect = canvas.getBoundingClientRect();
+    state.pan = { x:event.clientX, y:event.clientY, view,
+                  scale:view.sw / (rect.width || canvas.width || 1) };
+    canvas.setPointerCapture(event.pointerId); canvas.style.cursor = "grabbing";
+    event.preventDefault(); return;
+  }
+  if (state.poseBusy || state.reviewing || state.mode !== "points") return;
+  // While collecting landmarks, nearby clicks must place the next point rather
+  // than silently starting a drag on the previous one. Completed sets can drag.
+  const point = eventToImage(event), handle = state.placingPoint || nextEmptyPoint() ? null : nearestHandle(point);
   if (handle) { state.drag = handle; canvas.setPointerCapture(event.pointerId); return; }
   const target = state.active || nextEmptyPoint();
   if (!target) return;
@@ -809,22 +985,36 @@ canvas.addEventListener("pointerdown", event => {
   if (target === "shoulder" && state.pickingPitcher) { state.pickingPitcher = false; poseSeed(); }
 });
 canvas.addEventListener("pointermove", event => {
+  if (state.pan) {
+    const { x, y, view, scale } = state.pan;
+    state.zoomView = clampView({ sx:view.sx - (event.clientX - x) * scale,
+                                 sy:view.sy - (event.clientY - y) * scale, sw:view.sw, sh:view.sh });
+    draw(); return;
+  }
   if (!state.drag || blocked() || state.poseBusy || state.reviewing) return;
   const point = eventToImage(event);
-  point.x = Math.max(0,Math.min(state.img.width-0.01,point.x)); point.y = Math.max(0,Math.min(state.img.height-0.01,point.y));
+  point.x = Math.max(0,Math.min(imageDimensions().width-0.01,point.x)); point.y = Math.max(0,Math.min(imageDimensions().height-0.01,point.y));
   state.points[state.drag] = point; state.origin[state.drag] = "hand"; markDirty(); draw();
 });
-for (const event of ["pointerup","pointercancel","lostpointercapture"]) canvas.addEventListener(event, () => { state.drag = null; });
+for (const event of ["pointerup","pointercancel","lostpointercapture"])
+  canvas.addEventListener(event, () => { state.drag = null; state.pan = null; canvas.style.cursor = ""; });
+// Wheel and trackpad pinch zoom around the cursor, once the release is locked.
+canvas.addEventListener("wheel", event => {
+  if (blocked() || state.mode !== "points" || !state.img) return;
+  event.preventDefault();
+  zoomBy(Math.exp(-event.deltaY * (event.ctrlKey ? .01 : .0015)), eventToImage(event));
+}, { passive:false });
 el("scrub").addEventListener("input", event => goToFrame(Number(event.target.value)));
 el("playPause").addEventListener("click", togglePlay);
 el("confirmRelease").addEventListener("click", () => confirmRelease());
 el("releaseNext").addEventListener("click", () => confirmRelease({next:true}));
 el("savePoints").addEventListener("click", () => saveCurrent());
+el("nextReviewPitch").addEventListener("click", continueAnalysis);
 el("skipPitch").addEventListener("click", () => saveCurrent("skipped"));
 el("undoSave").addEventListener("click", undo);
 el("seedPoints").addEventListener("click", () => poseSeed());
 el("changeRelease").addEventListener("click", changeRelease);
-el("zoomPoints").addEventListener("click", () => { if (state.zoom) { state.zoom = false; draw(); } else fitZoom(); });
+el("zoomPoints").addEventListener("click", toggleZoom);
 el("choosePitcher").addEventListener("click", () => {
   clearPoints(); state.zoom = false; state.pickingPitcher = true; state.active = "shoulder"; markDirty(); draw();
   toast("Click the pitcher's throwing shoulder. The other body points will be suggested.");
@@ -851,7 +1041,7 @@ el("queueFilter").addEventListener("change", () => {
   else { renderQueue(); renderProgress(); if (!pitches.length) toast("No pitches in this queue."); }
 });
 el("openImport").addEventListener("click", () => { stopPlayback(); el("importPanel").hidden = false; el("videoFile").focus(); });
-el("closeImport").addEventListener("click", () => { el("importPanel").hidden = true; });
+el("closeImport").addEventListener("click", () => { el("importPanel").hidden = true; if (!el("startPanel").hidden) el("startVideo").focus(); });
 el("importPanel").addEventListener("submit", event => {
   event.preventDefault(); el("importError").hidden = true;
   uploadVideo();
@@ -873,13 +1063,20 @@ document.addEventListener("keydown", event => {
     goToFrame(state.frame + (event.shiftKey ? 10 : 1)*(key === "arrowright" ? 1 : -1)); return;
   }
   if (key === " ") { togglePlay(); return; }
-  if (key === "enter") { state.mode === "release" ? confirmRelease() : state.reviewing ? saveCurrent() : goReview(); return; }
+  if (key === "enter") { state.mode === "release" ? confirmRelease() : state.reviewing ? (ANALYSIS && !state.dirty && isComplete(state.labels.get(keyOf(state.current))) ? continueAnalysis() : saveCurrent()) : goReview(); return; }
   if (key === "u") { undo(); return; }
   if (key === "s") { saveCurrent("skipped"); return; }
+  // Zoom works wherever the frame is on screen, review included.
+  if (key === "z") { if (state.img && !state.poseBusy) toggleZoom(); return; }
+  if (["+","=","-","_"].includes(key)) {
+    if (!state.img || state.poseBusy) return;
+    const view = viewTransform();
+    zoomBy(["+","="].includes(key) ? 1.4 : 1/1.4, { x:view.sx + view.sw/2, y:view.sy + view.sh/2 });
+    return;
+  }
   if (state.mode !== "points" || state.poseBusy || state.reviewing) return;
   if (key === "p" && !ANALYSIS) poseSeed({force:event.shiftKey});
   if (key >= "1" && key <= "5") replacePoint(POINTS[Number(key)-1]);
-  if (key === "z") el("zoomPoints").click();
   if (key === "c") { clearPoints(); markDirty(); draw(); }
   if (key === "x" && state.points.shoulder && state.points.wrist) {
     [state.points.shoulder,state.points.wrist] = [state.points.wrist,state.points.shoulder];
@@ -890,6 +1087,7 @@ window.addEventListener("beforeunload", event => {
   if (state.dirty || state.drafts.size) { event.preventDefault(); event.returnValue = ""; }
 });
 function configureWorkspace() {
+  el("pitchNavigation").open = !ANALYSIS;
   document.title = ANALYSIS ? "Arm Angle CV · Pitch analysis" : "Arm Angle CV · Training labeler";
   el("analysisNav").className = ANALYSIS ? "active" : "";
   el("trainingNav").className = ANALYSIS ? "" : "active";
@@ -897,19 +1095,34 @@ function configureWorkspace() {
   el("workspaceEyebrow").textContent = ANALYSIS ? "UNDERSTAND YOUR DELIVERY" : "BUILD THE DATASET";
   el("workspaceTitle").textContent = ANALYSIS ? "Pitch analysis" : "Training labeler";
   el("workspaceDescription").textContent = ANALYSIS ? "Upload → lock release → mark five points → save → export CSV." : "One pitch at a time. Choose the release, mark the points, then review and save.";
-  const options = HOSTED ? [["local","My footage"]] : ANALYSIS ? [["local","My footage"],["batch","MLB examples"],["all","All available clips"]]
+  const options = HOSTED ? [["local","My footage"],["batch","MLB examples"]] : ANALYSIS ? [["local","My footage"],["batch","MLB examples"],["all","All available clips"]]
     : [["batch","New MLB trial batch"],["release","Need release"],["points","Need points"],["all","All MLB pitches"]];
   el("queueFilter").replaceChildren();
   for (const [value,label] of options) { const o = document.createElement("option");o.value = value;o.textContent = label;el("queueFilter").append(o); }
   el("queueFilter").value = ANALYSIS ? "local" : (state.pitches.some(p => p.uiTestBatch) ? "batch" : "release");
-  if (HOSTED) el("startExample").hidden = !HAS_EXAMPLE;
+  if (HOSTED) {
+    el("startExample").hidden = !HAS_EXAMPLE;
+    const count = Number(document.documentElement.dataset.exampleCount) || 5;
+    el("exampleTitle").textContent = "Try an example →";
+    el("exampleDescription").textContent = `Explore the steps with ${count} MLB ${count === 1 ? "pitch" : "pitches"}. No video needed.`;
+  }
 }
 el("prevFrame").addEventListener("click", () => goToFrame(state.frame-1));
 el("nextFrame").addEventListener("click", () => goToFrame(state.frame+1));
 el("reviewPoints").addEventListener("click", goReview);
 el("editPoints").addEventListener("click", editPoints);
 el("startVideo").addEventListener("click", () => el("openImport").click());
-el("startLocal").addEventListener("click", () => { el("queueFilter").value = "local"; const p = state.pitches.find(p => p.isLocal); if (p) showPitch(state.pitches.indexOf(p)); });
+// Example clones are stored like uploads, so "your uploads" excludes them.
+const ownUploads = () => state.pitches.filter(p => p.isLocal && !p.example);
+el("startLocal").addEventListener("click", () => {
+  if (blocked()) return;
+  const uploads = ownUploads(), session = uploads.at(-1)?.sessionId;
+  if (!session) return;
+  const pitches = uploads.filter(p => p.sessionId === session);
+  const next = pitches.find(p => !isComplete(state.labels.get(keyOf(p)))) || pitches[0];
+  el("queueFilter").value = "local"; state.sessionFilter = session;
+  showPitch(state.pitches.indexOf(next));
+});
 async function openExample() {
   if (blocked()) return;
   if (!HOSTED) {
@@ -918,20 +1131,23 @@ async function openExample() {
     if (local) await showPitch(state.pitches.indexOf(local));
     return;
   }
-  // Hosted visitors get a copy of the shared clip of their own, so practice
+  // Hosted visitors get copies of the shared clips of their own, so practice
   // annotations, exports and deletions stay inside their own workspace.
   el("startExample").disabled = true; state.busy = true;
   try {
     const data = await request("/api/example", {});
     state.busy = false;
-    let index = state.pitches.findIndex(p => p.playId === data.pitch.playId);
-    if (index < 0) index = state.pitches.push(data.pitch) - 1;
-    state.sessionFilter = data.pitch.sessionId; el("queueFilter").value = "local";
-    await showPitch(index);
+    const pitches = data.pitches || [data.pitch];
+    for (const pitch of pitches) {
+      if (!state.pitches.some(p => p.playId === pitch.playId)) state.pitches.push(pitch);
+    }
+    state.sessionFilter = ""; el("queueFilter").value = "batch";
+    const next = pitches.find(p => !isComplete(state.labels.get(keyOf(p)))) || pitches[0];
+    await showPitch(state.pitches.findIndex(p => p.playId === next.playId));
   } catch (error) {
     state.busy = false; el("startExample").disabled = false;
     el("intro").hidden = false; el("intro").textContent = `Could not open the example: ${error.message}`;
-  }
+  } finally { state.busy = false; el("startExample").disabled = false; }
 }
 el("startExample").addEventListener("click", openExample);
 el("downloadResult").addEventListener("click", exportSession);
@@ -939,7 +1155,11 @@ el("exportSession").addEventListener("click", exportSession);
 el("sessionSelect").addEventListener("change", async event => {
   state.sessionFilter = event.target.value;
   const pitch = state.pitches.find(p => p.sessionId === state.sessionFilter);
-  if (pitch) { el("queueFilter").value = pitch.isLocal ? "local" : "batch"; await showPitch(state.pitches.indexOf(pitch)); }
+  if (pitch) {
+    el("queueFilter").value = pitch.example || !pitch.isLocal ? "batch" : "local";
+    if (pitch.example) state.sessionFilter = "";
+    await showPitch(state.pitches.indexOf(pitch));
+  }
 });
 async function boot() {
   configureWorkspace();
@@ -950,8 +1170,10 @@ async function boot() {
     configureWorkspace();renderQueue();renderProgress();
     if (ANALYSIS) {
       el("intro").hidden = true;el("startPanel").hidden = false;
-      el("startLocal").disabled = !state.pitches.some(p => p.isLocal);
       el("startExample").disabled = HOSTED ? !HAS_EXAMPLE : !state.pitches.some(p => p.uiTestBatch);
+      const uploads = ownUploads(), sessions = new Set(uploads.map(p => p.sessionId)).size;
+      el("startLocal").hidden = !uploads.length;
+      el("startLocalDescription").textContent = `Reopen ${sessions === 1 ? "your saved video" : `your latest of ${sessions} saved videos`}. Switch videos from the session menu.`;
       return;
     }
     if (!state.pitches.length) { el("intro").textContent = "No MLB clips yet. Add a pitch batch to begin labeling."; return; }

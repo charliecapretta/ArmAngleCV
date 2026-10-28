@@ -1,0 +1,11 @@
+[Unit]
+Description=Hourly independent Arm Angle backup retention
+
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec=1h
+Persistent=true
+Unit=armangle-backup-prune.service
+
+[Install]
+WantedBy=timers.target

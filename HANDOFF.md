@@ -1,5 +1,37 @@
 # Arm Angle from Broadcast Video — handoff
 
+## Labeler zoom — September 19, 2026
+
+Zoom was close to useless where it was needed most. `viewTransform` returned
+the full frame unless two points were already placed, so pressing Z on a fresh
+release frame did nothing, and the joints had to be found at whatever size a
+1080p frame renders at inside a 54vh canvas.
+
+Locking the release frame now zooms. Placed points frame themselves as before;
+with none, the view crops to `PITCHER_CROP`, a fixed fraction of the frame
+rather than anything computed from the image. The fraction is measured, not
+guessed: across the 192 labeled pitches every shoulder and ball point falls in
+x 0.07-0.68 and y 0.34-0.87, and 99% in x 0.13-0.65, y 0.37-0.81. The crop is
+that box, about 1.9x, low and left of centre, and it is resolution independent,
+so the 1280x720 batch clips and the 1920x1080 phone reel get the same framing.
+
+A motion-difference detector was built first and rejected. It cropped tighter
+(2-3x) and held all five points on 24 of 24 sampled broadcast pitches, but on
+the owner's own reel it locked onto a batter that outmoved the pitcher, and no
+amount of blob-merging made the failure mode safe. A fixed crop cannot be
+wrong in that way and is ten lines instead of a hundred.
+
+Zoom is adjustable now that it is worth adjusting: the wheel (and trackpad
+pinch) zooms about the cursor up to 9x, shift-drag pans, `+`/`-` step it, and
+`Z` toggles the crop and the full frame -- in review as well as placement. A
+plain click still places a point. Every view is clamped inside the image and
+keeps its aspect ratio, and points are stored in image coordinates throughout,
+so nothing about the saved annotations depends on the zoom.
+
+34 JavaScript / 69 Python tests pass. Verified in a browser against the local
+server on both workspaces. No label file was written: the checks drove client
+state and never called `/api/label`.
+
 ## Hosted practice clip — September 19, 2026
 
 The deployed site hid "Try an MLB example" (`if (HOSTED) startExample.hidden = true`)

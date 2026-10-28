@@ -7,6 +7,7 @@ import hmac
 import ipaddress
 import json
 import os
+import re
 from pathlib import Path
 import secrets
 import shutil
@@ -17,8 +18,9 @@ import time
 import uuid
 from urllib.parse import urlsplit
 
-from flask import Flask, Response, abort, g, jsonify, redirect, render_template, request, session
-from werkzeug.exceptions import HTTPException
+from flask import Flask, Response, abort, g, jsonify, redirect, render_template, request, session, send_file
+from flask.sessions import SecureCookieSessionInterface
+from werkzeug.exceptions import HTTPException, TooManyRequests, RequestEntityTooLarge
 from werkzeug.security import check_password_hash
 from werkzeug.middleware.proxy_fix import ProxyFix
 
@@ -66,8 +68,11 @@ CREATE TABLE IF NOT EXISTS pitches(id TEXT PRIMARY KEY, video TEXT NOT NULL REFE
 CREATE TABLE IF NOT EXISTS labels(pitch TEXT PRIMARY KEY REFERENCES pitches(id) ON DELETE CASCADE, body TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS undo(token TEXT PRIMARY KEY, owner TEXT NOT NULL, pitch TEXT NOT NULL REFERENCES pitches(id) ON DELETE CASCADE, previous TEXT, expected TEXT, created REAL NOT NULL);
 CREATE TABLE IF NOT EXISTS attempts(key TEXT PRIMARY KEY, count INTEGER NOT NULL, since REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS dailyBudgets(key TEXT PRIMARY KEY, count INTEGER NOT NULL, resetAt INTEGER NOT NULL);
 CREATE INDEX IF NOT EXISTS videos_owner ON videos(owner);
 CREATE TABLE IF NOT EXISTS s3_objects(video TEXT PRIMARY KEY, bucket TEXT NOT NULL, key TEXT NOT NULL, region TEXT NOT NULL, version TEXT, state TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS deletions(video TEXT PRIMARY KEY, created REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT NOT NULL);
 '''
 
 
@@ -103,21 +108,36 @@ def media_lock(root):
 def cleanup(root, retention=7 * 86400, drain=True):
     """Caller holds media.lock; orphan folders also cover interrupted uploads."""
     with closing(connect(root)) as db, db:
+        # Finish a deletion interrupted after its ledger commit.
+        db.execute("UPDATE s3_objects SET state='delete' WHERE video IN (SELECT video FROM deletions)")
+        db.execute('DELETE FROM videos WHERE id IN (SELECT video FROM deletions)')
         db.execute("UPDATE s3_objects SET state='delete' WHERE state='pending' OR video IN (SELECT id FROM videos WHERE created < ?)", (time.time() - retention,))
         db.execute('DELETE FROM videos WHERE created < ?', (time.time() - retention,))
         db.execute('DELETE FROM undo WHERE created < ?', (time.time() - 86400,))
         db.execute('DELETE FROM attempts WHERE since < ?', (time.time() - 3600,))
+        db.execute('DELETE FROM dailyBudgets WHERE resetAt <= ?', (time.time(),))
         db.execute("DELETE FROM users WHERE password='!' AND username LIKE 'guest:%' AND id NOT IN (SELECT owner FROM videos)")
         active = {r['id'] for r in db.execute('SELECT id FROM videos')}
     for path in (Path(root) / 'videos').iterdir():
         if path.is_dir() and path.name not in active:
             shutil.rmtree(path)
     if drain:
-        storage.drain_deletions(root)
+        return storage.drain_deletions(root)
+    return 0
+
+
+class publicAssetSessions(SecureCookieSessionInterface):
+    def save_session(self, app, session, response):
+        # Publicly cached assets must never carry a visitor's Set-Cookie header,
+        # including Flask's automatic refresh of an existing permanent session.
+        if request.endpoint == 'asset':
+            return
+        super().save_session(app, session, response)
 
 
 def create_app(config=None):
     app = Flask(__name__, static_folder=None)
+    app.session_interface = publicAssetSessions()
     app.config.update(
         SECRET_KEY=os.environ.get('ARMANGLE_SECRET'),
         DATA_DIR=os.environ.get('ARMANGLE_DATA', '/var/lib/armangle'),
@@ -126,16 +146,32 @@ def create_app(config=None):
         PROXY_MODE=os.environ.get('ARMANGLE_PROXY', 'single'),
         S3_BUCKET=os.environ.get('ARMANGLE_S3_BUCKET', ''),
         S3_REGION=os.environ.get('ARMANGLE_S3_REGION', ''),
-        MAX_CONTENT_LENGTH=MAX_BYTES,
+        SUPPORT_EMAIL=os.environ.get('ARMANGLE_SUPPORT_EMAIL', ''),
+        DELETION_BUCKET=os.environ.get('ARMANGLE_DELETION_BUCKET', ''),
+        DELETION_REGION=os.environ.get('ARMANGLE_DELETION_REGION', ''),
+        RETAIN_ORIGINALS=os.environ.get('ARMANGLE_RETAIN_ORIGINALS', 'off') == 'on',
+        PUBLIC_RELEASE=os.environ.get('ARMANGLE_PUBLIC_RELEASE', 'off') == 'on',
+        EXAMPLES_ENABLED=os.environ.get('ARMANGLE_EXAMPLES', 'on') == 'on',
+        MAX_CONTENT_LENGTH=MAX_BYTES + 65536,
+        # Werkzeug parses file chunks in 64 KiB blocks; a lower form-memory
+        # ceiling rejects valid large files before the decoder sees them.
+        MAX_FORM_MEMORY_SIZE=131072, MAX_FORM_PARTS=5,
         SESSION_COOKIE_NAME='armangle_session', SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SECURE=True, SESSION_COOKIE_SAMESITE='Lax',
         PERMANENT_SESSION_LIFETIME=timedelta(hours=12),
-        USER_QUOTA=500 * 1024 * 1024, TOTAL_QUOTA=5 * 1024**3,
+        USER_QUOTA=1024**3, TOTAL_QUOTA=5 * 1024**3,
         RETENTION=7 * 86400,
+        FRAME_DAILY_LIMIT=10000, FRAME_IP_DAILY_LIMIT=20000,
+        UPLOAD_DAILY_LIMIT=10, UPLOAD_IP_DAILY_LIMIT=30,
     )
     if config:
         app.config.update(config)
+    if app.config['SUPPORT_EMAIL'] and not re.fullmatch(r'[A-Za-z0-9.!#$%&\'*+/=?^_`{|}~-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}', app.config['SUPPORT_EMAIL']):
+        raise RuntimeError('ARMANGLE_SUPPORT_EMAIL must be an email address.')
     storage.validate_config(app.config['S3_BUCKET'], app.config['S3_REGION'])
+    storage.validate_config(app.config['DELETION_BUCKET'], app.config['DELETION_REGION'])
+    if app.config['PUBLIC_RELEASE'] and (not app.config['SUPPORT_EMAIL'] or not app.config['DELETION_BUCKET']):
+        raise RuntimeError('Public release requires a support email and an off-instance deletion ledger.')
     if app.config['ACCESS_MODE'] not in ('accounts', 'anonymous'):
         raise RuntimeError('ARMANGLE_ACCESS must be accounts or anonymous.')
     if app.config['PROXY_MODE'] not in ('single', 'cloudfront-vpc'):
@@ -160,6 +196,10 @@ def create_app(config=None):
         raise RuntimeError('The hosted model feature schema is invalid.')
     root = Path(app.config['DATA_DIR'])
     initialize(root)
+    if (root / 'restore.pending').exists():
+        raise RuntimeError('Restored data is quarantined. Run restore-reconcile before starting the service.')
+    from hosted.deletions import configure
+    configure(root, app.config['DELETION_BUCKET'], app.config['DELETION_REGION'])
     # Only deploy behind a trusted loopback proxy with verified forwarding headers.
     if app.config['PROXY_MODE'] == 'cloudfront-vpc':
         app.wsgi_app = CloudFrontVpcProxy(app.wsgi_app)
@@ -187,6 +227,8 @@ def create_app(config=None):
             return
         if not app.testing and request.host_url.rstrip('/') != origin:
             abort(400, description='Unexpected host.')
+        if request.endpoint == 'asset' and request.method in ('GET', 'HEAD'):
+            return
         if request.method == 'POST':
             if request.path != '/api/upload' and (request.content_length is None or request.content_length > 65536):
                 abort(413)
@@ -195,7 +237,7 @@ def create_app(config=None):
                 abort(403, description='Your session expired. Reload the analysis page and retry.')
             if request.headers.get('Origin') and request.headers['Origin'] != origin:
                 abort(403, description='Unexpected request origin.')
-        if request.path not in ('/login', '/workspace.css'):
+        if request.path not in ('/login', '/workspace.css', '/privacy'):
             if anonymous:
                 identifier = session.get('guest_id')
                 if identifier is None:
@@ -222,10 +264,13 @@ def create_app(config=None):
 
     @app.after_request
     def headers(response):
-        response.headers['Cache-Control'] = 'no-store, private'
+        if 'Cache-Control' not in response.headers:
+            response.headers['Cache-Control'] = 'no-store, private'
         response.headers['X-Content-Type-Options'] = 'nosniff'
         response.headers['Referrer-Policy'] = 'same-origin'
         response.headers['X-Frame-Options'] = 'DENY'
+        if request.is_secure:
+            response.headers['Strict-Transport-Security'] = 'max-age=31536000'
         response.headers['Content-Security-Policy'] = "default-src 'self'; img-src 'self' blob: data:; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
         return response
 
@@ -238,7 +283,38 @@ def create_app(config=None):
         else:
             app.logger.exception('Hosted request failed')
             code, message = 500, 'The request could not be completed. Please retry.'
-        return jsonify(error=message), code
+        response = jsonify(error=message)
+        response.status_code = code
+        if code == 429:
+            response.headers['Retry-After'] = str(getattr(error, 'retry_after', None) or 60)
+        if code == 413 and request.path == '/api/upload' and message == RequestEntityTooLarge.description:
+            response = jsonify(error='Choose an MP4 up to 200 MB.')
+            response.status_code = 413
+        return response
+
+    def dailyBudget(kind, sessionLimit, addressLimit):
+        # 10,000 frames permits 5 complete passes over all five 362-frame demos
+        # (9,050), plus 950 requests for revisits, full-size locks and thumbnails.
+        # An independent address budget survives cookie rotation. SQLite reserves
+        # both atomically across threads/workers/restarts; invalid frame IDs count.
+        now = int(time.time())
+        resetAt = (now // 86400 + 1) * 86400  # UTC day boundary
+        addressKey = hmac.new(str(app.config['SECRET_KEY']).encode(),
+                              str(request.remote_addr).encode(), hashlib.sha256).hexdigest()
+        sessionKey = session.get('guest_id') or session.get('csrf')
+        limits = [(kind + ':session:' + str(sessionKey), sessionLimit),
+                  (kind + ':ip:' + addressKey, addressLimit)]
+        with db():
+            db().execute('BEGIN IMMEDIATE')
+            for budgetKey, limit in limits:
+                row = db().execute('SELECT count,resetAt FROM dailyBudgets WHERE key=?', (budgetKey,)).fetchone()
+                if row and row['resetAt'] > now and row['count'] >= limit:
+                    raise TooManyRequests(description=f'Daily {kind} limit reached. Please try again after midnight UTC.',
+                                          retry_after=resetAt-now)
+            for budgetKey, _ in limits:
+                db().execute('INSERT INTO dailyBudgets VALUES (?,1,?) ON CONFLICT(key) DO UPDATE SET '
+                             'count=CASE WHEN resetAt<=? THEN 1 ELSE count+1 END, resetAt=excluded.resetAt',
+                             (budgetKey, resetAt, now))
 
     @app.get('/healthz')
     def health():
@@ -285,24 +361,44 @@ def create_app(config=None):
     @app.get('/analyze.html')
     def index():
         hosted_attributes = 'data-workspace="analysis" data-hosted="true"'
-        if example.available(root):
-            hosted_attributes += ' data-example="true"'
+        example_count = min(5, len(example.available(root))) if app.config['EXAMPLES_ENABLED'] else 0
+        if example_count:
+            hosted_attributes += f' data-example="true" data-example-count="{example_count}"'
         html = (ROOT / 'labelTool.html').read_text().replace('data-workspace="training"', hosted_attributes)
         html = html.replace('</head>', '<meta name="csrf-token" content="' + csrf() + '"></head>')
-        html = html.replace('</header>', '<a href="/account">' + ('My uploads' if anonymous else 'My account') + '</a></header>')
-        html = html.replace('MP4 · up to 100 MB, 60 seconds, 1920 × 1080, 60 fps, and 3,600 frames. A copy is saved by this app.',
-                            'Private beta · MP4 up to 50 MB, 30 seconds, 1920 × 1080, 60 fps. Videos and annotations expire after 7 days. Export your CSV to keep results. Storage limit: 500 MB per account, including prepared frames. One upload is prepared at a time.')
+        html = html.replace('</header>', '<a href="/account">' + ('My uploads' if anonymous else 'My account') + '</a> <a href="/privacy">Privacy &amp; data</a></header>')
+        if (root / 'uploads.paused').exists():
+            html = html.replace('</header>', '</header><p role="status">New uploads and practice sessions are temporarily paused. You can still review and export saved work.</p>')
+        storage_scope = 'browser' if anonymous else 'account'
+        storage_contents = ('including originals and prepared frames.' if app.config['RETAIN_ORIGINALS']
+                            else 'for prepared frames. Original files are discarded after processing.')
+        upload_info = (
+            '<div id="uploadInfo"><p class="expiryNotice"><strong>Expires in 7 days — export your CSV.</strong> '
+            'Videos and annotations are automatically removed.</p>'
+            '<ul class="uploadFacts"><li>MP4 up to 200 MB, 60 seconds, 1920 × 1080, 60 fps. Use 60fps 1080 for best results.</li>'
+            f'<li>Storage limit: 1 GB per {storage_scope}, {storage_contents} One upload is prepared at a time.</li>'
+        )
         if anonymous:
-            html = html.replace('Private beta · MP4 up to 50 MB, 30 seconds, 1920 × 1080, 60 fps.',
-                                'Use 60fps 1080 for best results<br>MP4 up to 50 MB and 30 seconds.').replace('500 MB per account', '500 MB per browser')
-            html = html.replace('One upload is prepared at a time.', 'One upload is prepared at a time. Your uploads are available only in this browser. Clearing cookies or using another device starts a new workspace. Export your CSV to keep your results.')
+            upload_info += ('<li>Your uploads are available only in this browser. Clearing cookies or using another '
+                            'device starts a new workspace.</li>')
+        upload_info += '</ul></div>'
+        start = html.index('<div id="uploadInfo">')
+        end = html.index('</div>', start) + len('</div>')
+        html = html[:start] + upload_info + html[end:]
         return Response(html, mimetype='text/html')
+
+    @app.get('/privacy')
+    def privacy():
+        return render_template('privacy.html', support_email=app.config['SUPPORT_EMAIL'], anonymous=anonymous,
+                               retain_originals=app.config['RETAIN_ORIGINALS'])
 
     @app.get('/workspace.css')
     @app.get('/labelTool.js')
     def asset():
         name = request.path[1:]
-        return Response((ROOT / name).read_bytes(), mimetype='text/css' if name.endswith('.css') else 'text/javascript')
+        response = send_file(ROOT / name, conditional=True, max_age=31536000)
+        response.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
+        return response
 
     def owned_pitch(identifier):
         row = db().execute('SELECT p.*,v.metadata AS video_meta,v.created FROM pitches p JOIN videos v ON v.id=p.video WHERE p.id=? AND v.owner=? AND v.created>=?',
@@ -310,6 +406,8 @@ def create_app(config=None):
         if row is None:
             abort(404, description='Pitch not found or expired.')
         pitch = json.loads(row['metadata'])
+        if pitch.get('example') and not app.config['EXAMPLES_ENABLED']:
+            abort(404, description='This practice clip is unavailable.')
         meta = json.loads(row['video_meta'])
         return row, pitch, meta
 
@@ -352,6 +450,8 @@ def create_app(config=None):
     @app.get('/api/clip')
     @app.get('/api/frame')
     def clip():
+        if request.path == '/api/frame':
+            dailyBudget('frame', app.config['FRAME_DAILY_LIMIT'], app.config['FRAME_IP_DAILY_LIMIT'])
         directory = request.args.get('dir', '')
         if not directory.startswith('local_'):
             abort(404)
@@ -361,10 +461,18 @@ def create_app(config=None):
         index = int(request.args.get('frame', '0'))
         if not 0 <= index < meta['nFrames']:
             abort(404)
-        path = root / 'videos' / row['video'] / f'{index:04d}.jpg'
+        frameSize = request.args.get('size', 'full')
+        if frameSize not in ('full', 'scrub'):
+            abort(400, description='Frame size must be full or scrub.')
+        frameFormat = meta.get('frameFormat', 'jpg')
+        suffix = '.scrub.webp' if frameSize == 'scrub' and meta.get('scrubWidth') else '.' + frameFormat
+        path = root / 'videos' / row['video'] / f'{index:04d}{suffix}'
         if not path.is_file():
             abort(404)
-        return Response(path.read_bytes(), mimetype='image/jpeg')
+        response = send_file(path, mimetype='image/webp' if path.suffix == '.webp' else 'image/jpeg',
+                             conditional=False, etag=False, max_age=0)
+        response.headers['Cache-Control'] = 'no-store, private'
+        return response
 
     @app.post('/api/predict-angle')
     def predict():
@@ -446,24 +554,44 @@ def create_app(config=None):
 
     @app.post('/api/example')
     def add_example():
-        """Hand this visitor their own copy of the shared practice clip."""
+        """Open up to five distinct private practice pitches, preserving prior work."""
+        if not app.config['EXAMPLES_ENABLED']:
+            abort(404, description='Practice clips are unavailable.')
+        if (root / 'uploads.paused').exists():
+            abort(503, description='New uploads and practice sessions are temporarily paused. Saved work can still be exported.')
         value = payload()
         if set(value) - {'workspace'}:
             abort(400)
         slugs = example.available(root)
         if not slugs:
             abort(404, description='No practice clip is installed on this server.')
-        slug = slugs[0]
-        mine = example.existing(list_pitches(), slug)
-        if mine is not None:
-            return dict(ok=True, pitch=mine, reused=True)
+        created = []
         with media_lock(root):
-            if shutil.disk_usage(root).free < 1024 ** 3:
-                abort(413, description='Storage is full. Please try again later.')
-            with db():
-                db().execute('BEGIN IMMEDIATE')
-                pitch = example.clone(db(), root, g.user['id'], slug, guest=anonymous)
-        return dict(ok=True, pitch=pitch, reused=False)
+            try:
+                with db():
+                    db().execute('BEGIN IMMEDIATE')
+                    # Recheck inside the lock so retries never duplicate a visitor's clips.
+                    mine = {}
+                    for pitch in list_pitches():
+                        if pitch.get('example') in slugs:
+                            mine.setdefault(pitch['example'], pitch)
+                    practice = list(mine.values())[:5]
+                    for slug in slugs:
+                        if len(practice) >= 5:
+                            break
+                        if slug in mine:
+                            continue
+                        if shutil.disk_usage(root).free < 1024 ** 3:
+                            abort(413, description='Storage is full. Please try again later.')
+                        pitch = example.clone(db(), root, g.user['id'], slug, guest=anonymous)
+                        created.append(pitch)
+                        practice.append(pitch)
+            except Exception:
+                # The database rolls back the whole set; remove only its new clone folders.
+                for pitch in created:
+                    shutil.rmtree(root / 'videos' / pitch['sessionId'], ignore_errors=True)
+                raise
+        return dict(ok=True, pitches=practice, pitch=practice[0], reused=not created)
 
     @app.get('/api/export')
     def export():
@@ -472,12 +600,28 @@ def create_app(config=None):
 
     @app.post('/api/upload')
     def upload():
-        if not request.content_length or not 0 < request.content_length <= MAX_BYTES:
-            abort(413, description='Choose an MP4 up to 50 MB.')
-        name = request.args.get('filename', '').replace('\\', '/').split('/')[-1]
+        if (root / 'uploads.paused').exists():
+            abort(503, description='New uploads are temporarily paused. Saved work can still be exported.')
+        multipart = request.mimetype == 'multipart/form-data'
+        if not request.content_length or not 0 < request.content_length <= MAX_BYTES + (65536 if multipart else 0):
+            abort(413, description='Choose an MP4 up to 200 MB.')
+        dailyBudget('upload', app.config['UPLOAD_DAILY_LIMIT'], app.config['UPLOAD_IP_DAILY_LIMIT'])
+        if multipart:
+            uploaded = request.files.get('video')
+            if uploaded is None or len(request.files) != 1 or len(request.files.getlist('video')) != 1:
+                abort(400, description='Choose one MP4 video.')
+            metadata = request.form
+            name = (uploaded.filename or '').replace('\\', '/').split('/')[-1]
+            stream = uploaded.stream
+        else:
+            # Compatibility for existing raw-video API clients. The hosted UI
+            # uses multipart fields so personal metadata never enters its URL.
+            metadata = request.args
+            name = metadata.get('filename', '').replace('\\', '/').split('/')[-1]
+            stream = request.stream
         if not name.lower().endswith('.mp4') or len(name) > 240:
             abort(400, description='Choose an MP4 video.')
-        throws = request.args.get('pThrows', 'R')
+        throws = metadata.get('pThrows', 'R')
         if throws not in ('R', 'L'):
             abort(400)
         with media_lock(root):
@@ -498,22 +642,30 @@ def create_app(config=None):
                         db().execute('INSERT INTO attempts VALUES (?,1,?) ON CONFLICT(key) DO UPDATE SET count=count+1', (key, now))
             used = db().execute('SELECT COALESCE(SUM(bytes),0) FROM videos WHERE owner=?', (g.user['id'],)).fetchone()[0]
             total = db().execute('SELECT COALESCE(SUM(bytes),0) FROM videos').fetchone()[0]
-            reserve = MAX_BYTES + MAX_FRAME_BYTES
-            if used + reserve > app.config['USER_QUOTA'] or total + reserve > app.config['TOTAL_QUOTA'] or shutil.disk_usage(root).free < reserve + 1024**3:
-                abort(413, description='Storage is full. Delete an older session from ' + ('My uploads' if anonymous else 'My account') + ' and retry.')
+            # Reserve this original's declared length plus the bounded frame budget.
+            # The media lock prevents two preparations from spending the same space.
+            reserve = min(request.content_length, MAX_BYTES) + MAX_FRAME_BYTES
+            if used + reserve > app.config['USER_QUOTA']:
+                abort(413, description='Your storage is full. Delete an older session from ' + ('My uploads' if anonymous else 'My account') + ' and retry.')
+            if total + reserve > app.config['TOTAL_QUOTA'] or shutil.disk_usage(root).free < reserve + 1024**3:
+                abort(503, description='Server storage is temporarily full. Please try again later.')
             video = uuid.uuid4().hex
             directory = root / 'videos' / video
             directory.mkdir(mode=0o700)
             registered = False
             try:
                 with (directory / 'source.mp4').open('xb') as handle:
-                    remaining = request.content_length
-                    while remaining:
-                        chunk = request.stream.read(min(1024 * 1024, remaining))
+                    received = 0
+                    while True:
+                        chunk = stream.read(min(1024 * 1024, MAX_BYTES + 1 - received))
                         if not chunk:
-                            abort(400, description='Upload was interrupted.')
+                            break
+                        received += len(chunk)
+                        if received > MAX_BYTES:
+                            abort(413, description='Choose an MP4 up to 200 MB.')
                         handle.write(chunk)
-                        remaining -= len(chunk)
+                    if not received or (not multipart and received != request.content_length):
+                        abort(400, description='Upload was interrupted.')
                 result = subprocess.run([sys.executable, '-m', 'hosted.video', str(directory)], cwd=ROOT,
                                         capture_output=True, text=True, timeout=100,
                                         env={**os.environ, 'OPENBLAS_NUM_THREADS': '1', 'OMP_NUM_THREADS': '1'})
@@ -521,9 +673,14 @@ def create_app(config=None):
                     abort(400, description=result.stderr.strip()[-300:] or 'Video preparation failed.')
                 meta = json.loads((directory / 'meta.json').read_text())
                 size = sum(p.stat().st_size for p in directory.iterdir())
-                details = dict(sourceName=name, sessionName=request.args.get('sessionName', '')[:160] or name,
-                               pitcherName=request.args.get('pitcherName', '')[:160], pThrows=throws)
-                if app.config['S3_BUCKET']:
+                details = dict(sourceName=name, sessionName=metadata.get('sessionName', '')[:160] or name,
+                               pitcherName=metadata.get('pitcherName', '')[:160], pThrows=throws)
+                if not app.config['RETAIN_ORIGINALS']:
+                    (directory / 'source.mp4').unlink()
+                    meta['original'] = dict(kind='discarded')
+                    (directory / 'meta.json').write_text(json.dumps(meta))
+                    size = sum(p.stat().st_size for p in directory.iterdir())
+                elif app.config['S3_BUCKET']:
                     try:
                         meta['original'] = storage.store_original(root, video, directory / 'source.mp4',
                                                                   app.config['S3_BUCKET'], app.config['S3_REGION'])
@@ -538,7 +695,7 @@ def create_app(config=None):
                     pitch = new_pitch(video, meta, details)
                     db().execute("UPDATE s3_objects SET state='active' WHERE video=?", (video,))
                 registered = True
-                if app.config['S3_BUCKET']:
+                if app.config['RETAIN_ORIGINALS'] and app.config['S3_BUCKET']:
                     # Registration and S3 succeeded. Frames remain local for annotation.
                     try:
                         (directory / 'source.mp4').unlink()
@@ -559,6 +716,36 @@ def create_app(config=None):
         items = [dict(id=v['id'], name=json.loads(v['metadata'])['sessionName'], expires=time.strftime('%Y-%m-%d', time.gmtime(v['created'] + app.config['RETENTION']))) for v in videos]
         return render_template('account.html', username=g.user['username'], videos=items, csrf=csrf(), anonymous=anonymous)
 
+    def remove_videos(identifiers):
+        from hosted import deletions
+        try:
+            deletions.record(root, identifiers, app.config['DELETION_BUCKET'], app.config['DELETION_REGION'])
+        except Exception:
+            app.logger.exception('Could not persist deletion records')
+            abort(503, description='Deletion could not be confirmed. Please retry; recovery protection is temporarily unavailable.')
+        with db():
+            for identifier in identifiers:
+                db().execute("UPDATE s3_objects SET state='delete' WHERE video=?", (identifier,))
+                db().execute('DELETE FROM videos WHERE id=?', (identifier,))
+        local_pending = False
+        for identifier in identifiers:
+            directory = root / 'videos' / identifier
+            shutil.rmtree(directory, ignore_errors=True)
+            local_pending |= directory.exists()
+        remote_pending = bool(storage.drain_deletions(root))
+        return local_pending or remote_pending
+
+    @app.post('/api/delete-all')
+    def delete_all():
+        payload()
+        with media_lock(root):
+            identifiers = [r['id'] for r in db().execute('SELECT id FROM videos WHERE owner=?', (g.user['id'],))]
+            pending = remove_videos(identifiers)
+        session.clear()
+        response = jsonify(ok=True, storageDeletionPending=pending)
+        response.headers['Clear-Site-Data'] = '"cache", "cookies", "storage"'
+        return response
+
     @app.post('/api/delete-session')
     def delete_session():
         value = payload()
@@ -566,11 +753,7 @@ def create_app(config=None):
             row = db().execute('SELECT id FROM videos WHERE id=? AND owner=?', (value.get('sessionId'), g.user['id'])).fetchone()
             if not row:
                 abort(404)
-            with db():
-                db().execute("UPDATE s3_objects SET state='delete' WHERE video=?", (row['id'],))
-                db().execute('DELETE FROM videos WHERE id=?', (row['id'],))
-            shutil.rmtree(root / 'videos' / row['id'], ignore_errors=True)
-            pending = storage.drain_deletions(root, video=row['id'])
+            pending = remove_videos([row['id']])
         return dict(ok=True, storageDeletionPending=bool(pending))
 
     @app.get('/account.js')

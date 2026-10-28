@@ -13,14 +13,14 @@ beyond the bundle, taxes and unused static IPs can add costs. No AWS resource ha
 verification results and remaining deployment checks.
 
 Start with 3–5 invited friends, with one person uploading at a time. Limit uploads to
-H.264 MP4, 50 MB, 30 seconds, 1280 × 720, 30 fps, 900 frames. Decoding happens in a
+MP4, 200 MB, 60 seconds, 1920 × 1080, 60 fps, 3,600 frames. Decoding happens in a
 separate process with a 100-second timeout. Only one upload decoder runs at a time;
 other upload attempts receive an explicit busy/retry response. JPEG frames are stored
 on private disk and served one at a time. No whole-video server RAM cache is used.
-One clip may use up to 150 MB of prepared frames in addition to its original upload.
+One clip may use up to 800 MB of prepared frames in addition to its original upload.
 
-Accounts have 500 MB storage, the app has a 5 GB global quota, and uploads reserve the
-maximum 200 MB before beginning. This can reject a clip even when some storage remains.
+Accounts have 1 GB storage, the app has a 5 GB global quota, and uploads reserve the
+declared source size plus 800 MB for frames (up to 1,000 MB) before beginning. This can reject a clip even when some storage remains.
 Keep at least 1 GB of free disk space. Limit each session to 50 pitch annotations.
 Videos, prepared frames, and annotations expire together after 7 days. Expired sessions
 are inaccessible immediately; the hourly cleanup removes them from disk. Export CSVs
@@ -140,13 +140,19 @@ sudo -u armangle .venv/bin/python -m hosted.manage example install /tmp/clip.mp4
   --pitcher 'Scherzer, Max' --throws R --park TOR --angle 38.2
 ```
 
-`--meta pitch.json` reads the same fields from a `uiTestBatch.json` entry instead. The
-clip is prepared once into `/var/lib/armangle/examples/`, outside the per-visitor
-`videos/` tree, and the seven-day cleanup never removes it. Each visitor who opens the
-example gets a pitch of their own whose frames are hard links to that one copy: their
-annotations, exports and deletions stay private, the clone costs no additional disk and
-no storage quota, and retention expires the clone rather than the clip. `example list`
-and `example remove` show and withdraw it; `example install --replace` swaps in another.
+`--meta pitch.json` reads the same fields from a `uiTestBatch.json` entry instead, and
+`--slug` names the clip; without it the name is `mlb-example`. Install several, under
+different slugs, to cover a range of arm slots.
+
+Each clip is prepared once into `/var/lib/armangle/examples/`, outside the per-visitor
+`videos/` tree, and the seven-day cleanup never removes it. A visitor who opens the
+example draws one installed clip at random and keeps it: reopening returns the pitch
+they have already worked on rather than drawing again. Their copy is a pitch of their
+own whose frames are hard links to the shared one, so annotations, exports and deletions
+stay private, the clone costs no additional disk and no storage quota, and retention
+expires the clone rather than the clip. `example list` and `example remove --slug` show
+and withdraw them; `example install --replace` rebuilds one in place. Budget about 65 MB
+of prepared frames per clip.
 
 `--angle` is the Statcast arm angle. The review step reveals it once all five points are
 placed, so the practice run ends in a comparison against a known answer. Uploads have no
@@ -154,7 +160,7 @@ such reference and still show none.
 
 Serving a clip here publishes it to every visitor, which is not what the downloader in
 `fetchUiTestBatch.py` retrieves footage for. Confirm you may redistribute a clip before
-installing it, and remove it with `example remove` if that changes.
+installing it, and remove it with `example remove --slug` if that changes.
 
 ## 5. Verify before inviting friends
 
