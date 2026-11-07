@@ -12,8 +12,8 @@ Sampling is stratified on arm_angle bucket x venue so the batch spans both a wid
 range of arm slots and multiple park camera positions.
 
 Usage:
-    python fetchPitchBatch.py --nPitches 250
-    python fetchPitchBatch.py --nPitches 5 --dryRun
+    python scripts/fetchPitchBatch.py --nPitches 250
+    python scripts/fetchPitchBatch.py --nPitches 5 --dryRun
 """
 
 import argparse
@@ -24,9 +24,10 @@ import sys
 import numpy as np
 import pandas as pd
 
-import savantUtils
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # repo root
 
-DEFAULT_STATCAST_CSV = os.path.join(savantUtils.PROJECT_DIR, "savant_data.csv")
+from armangle import savantUtils
+DEFAULT_STATCAST_CSV = os.path.join(savantUtils.PROJECT_DIR, "data", "savant_data.csv")
 
 # Pitches where the broadcast holds on the delivery rather than cutting to the ball.
 PREFERRED_DESCRIPTIONS = {

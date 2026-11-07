@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const vm = require('node:vm');
 const fs = require('node:fs');
 const path = require('node:path');
-const source = fs.readFileSync(path.join(__dirname,'../labelTool.js'),'utf8').replace(/boot\(\);\s*$/, '');
+const source = fs.readFileSync(path.join(__dirname,'../web/labelTool.js'),'utf8').replace(/boot\(\);\s*$/, '');
 function harness(workspace='training', hosted=false, example=false) {
   const elements = new Map();
   class Element {

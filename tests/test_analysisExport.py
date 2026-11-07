@@ -4,9 +4,8 @@ from pathlib import Path
 import unittest
 from joblib import load
 
-import analysisExport
-import angleInputs
-
+from armangle import analysisExport
+from armangle import angleInputs
 ROOT = Path(__file__).resolve().parents[1]
 
 

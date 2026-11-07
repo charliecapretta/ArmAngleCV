@@ -12,14 +12,17 @@ import os
 from pathlib import Path
 import time
 import numpy as np
-from releaseTiming import flightSeconds, speedOnlyFlightSeconds, releaseFrameFromArrival
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # repo root
 
-ROOT = Path(__file__).resolve().parent
+from armangle.releaseTiming import flightSeconds, speedOnlyFlightSeconds, releaseFrameFromArrival
+
+ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / 'reports/release_detection'
 
 
 def joinedRows():
-    statcast = {(r['game_pk'],r['at_bat_number'],r['pitch_number']):r for r in csv.DictReader((ROOT/'savant_data.csv').open())}
+    statcast = {(r['game_pk'],r['at_bat_number'],r['pitch_number']):r for r in csv.DictReader((ROOT/'data'/'savant_data.csv').open())}
     feeds = {}
     for p in (ROOT/'cache/gf').glob('*.json'):
         data = json.loads(p.read_text())
@@ -28,7 +31,7 @@ def joinedRows():
                 if event.get('type')=='pitch' and event.get('play_id'):
                     feeds[(p.stem,event['play_id'])]=event
     rows=[]
-    for label in csv.DictReader((ROOT/'labels.csv').open()):
+    for label in csv.DictReader((ROOT/'data'/'labels.csv').open()):
         if label['status']!='labeled':continue
         key=f"{label['game_pk']}_{label['play_id']}"
         meta=json.loads((ROOT/'pitches'/key/'meta.json').read_text())
@@ -160,7 +163,7 @@ def detectDiagnostic(rows,limit):
 def main():
     parser=argparse.ArgumentParser();parser.add_argument('--detect-limit',type=int,default=0);args=parser.parse_args()
     OUT.mkdir(parents=True,exist_ok=True)
-    (OUT/'input_snapshot.json').write_text(json.dumps({name:hashlib.sha256((ROOT/name).read_bytes()).hexdigest() for name in ['labels.csv','localLabels.csv','armAngleModel.joblib','armAngleModelResolutionSafe.joblib']},indent=2))
+    (OUT/'input_snapshot.json').write_text(json.dumps({name:hashlib.sha256((ROOT/name).read_bytes()).hexdigest() for name in ['data/labels.csv','localLabels.csv','model/armAngleModel.joblib','model/armAngleModelResolutionSafe.joblib']},indent=2))
     rows=joinedRows();audit(rows)
     if args.detect_limit:detectDiagnostic(rows,args.detect_limit)
 

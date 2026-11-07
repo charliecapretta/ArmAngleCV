@@ -11,7 +11,7 @@ by path in localVideos.json without copying the footage. Extracting frames as JP
 itself, so clips are decoded into RAM on first touch and the least recently
 used is evicted. Pose runs lazily, one frame at a time, only when asked.
 
-    python labelServer.py
+    python -m armangle
     then open http://127.0.0.1:8777/labelTool.html
 
 Endpoints:
@@ -40,16 +40,18 @@ import urllib.parse
 from collections import OrderedDict
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 
-import savantUtils
-import analysisExport
-import videoUploads
-from features import deriveAngles
+from armangle import savantUtils
+from armangle import analysisExport
+from armangle import videoUploads
+from armangle.features import deriveAngles
 
-LABELS_PATH = os.path.join(savantUtils.PROJECT_DIR, "labels.csv")
+LABELS_PATH = os.path.join(savantUtils.PROJECT_DIR, "data", "labels.csv")
 LOCAL_LABELS_PATH = os.path.join(savantUtils.PROJECT_DIR, "localLabels.csv")
 LOCAL_VIDEOS_PATH = os.path.join(savantUtils.PROJECT_DIR, "localVideos.json")
 ANALYSIS_LABELS_PATH = os.path.join(savantUtils.PROJECT_DIR, "analysisLabels.csv")
 UPLOADS_PATH = os.path.join(savantUtils.PROJECT_DIR, "uploads")
+WEB_DIR = os.path.join(savantUtils.PROJECT_DIR, "web")
+WEB_ASSETS = ("/labelTool.html", "/labelTool.js", "/workspace.css")
 
 # Column order is append-only: the first 17 are the original schema, so rows
 # written before the 5-point expansion stay readable and simply carry blanks.
@@ -619,7 +621,7 @@ manualAngleLock = threading.Lock()
 
 
 def getManualAngleBundle():
-    import angleInputs
+    from armangle import angleInputs
     from joblib import load
     global manualAngleBundle
     with manualAngleLock:
@@ -633,7 +635,7 @@ def getManualAngleBundle():
 
 def predictManualAngle(payload):
     """Read-only prediction using the versioned model for manually clicked points."""
-    import angleInputs
+    from armangle import angleInputs
     if payload.get("status") != "labeled":
         raise ValueError("Five visible points are required for this angle model")
     row = validateLabel(payload)  # Source dimensions come from the decoded clip.
@@ -647,6 +649,12 @@ def predictManualAngle(payload):
 class Handler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=savantUtils.PROJECT_DIR, **kwargs)
+
+    def translate_path(self, path):
+        # The browser UI keeps its root URLs; the files live in web/.
+        if urllib.parse.urlparse(path).path in WEB_ASSETS:
+            return os.path.join(WEB_DIR, urllib.parse.urlparse(path).path.lstrip("/"))
+        return super().translate_path(path)
 
     def log_message(self, fmt, *args):
         if "/api/" in (self.path or ""):
@@ -675,7 +683,7 @@ class Handler(SimpleHTTPRequestHandler):
         if workspace not in (None, "training", "analysis"):
             return self.sendJson({"error": "Unknown workspace"}, 400)
         if parsed.path in ("/", "/index.html", "/analyze.html"):
-            with open(os.path.join(savantUtils.PROJECT_DIR, "labelTool.html"), "r") as handle:
+            with open(os.path.join(WEB_DIR, "labelTool.html"), "r") as handle:
                 html = handle.read().replace('data-workspace="training"', 'data-workspace="analysis"')
             body = html.encode("utf-8")
             self.send_response(200)
@@ -858,7 +866,7 @@ def main():
     print(f"Serving {savantUtils.PROJECT_DIR}")
     print(f"{len(pitches)} pitches with clips (frames decoded on demand)")
     if not pitches:
-        print("  (none yet -- open a local video in the labeler, or run fetchPitchBatch.py)")
+        print("  (none yet -- open a local video in the labeler, or run scripts/fetchPitchBatch.py)")
     print(f"Labels -> {LABELS_PATH}")
     print(f"\n  open http://127.0.0.1:{httpd.server_port}/index.html\n", flush=True)
 

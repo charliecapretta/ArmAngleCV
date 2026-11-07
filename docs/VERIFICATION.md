@@ -18,7 +18,7 @@ were installed separately for the live download check.
 - The frozen model matches a refit on its exact original training snapshot and
   reproduces 2.653° RMSE, versus 3.227° for the direct angle baseline.
 - Uniform resizing leaves the released model's predictions unchanged.
-- Model and source-label checksums match `model-manifest.json`.
+- Model and source-label checksums match `model/model-manifest.json`.
 
 The GitHub workflow is configured but has not run on GitHub, because nothing has
 been published. These results are local checks, not a claim of completed hosted CI.
@@ -26,7 +26,7 @@ been published. These results are local checks, not a claim of completed hosted 
 ## Clean-copy download and browser check
 
 One fixed MLB example was downloaded into a prepared public copy with no existing
-video folder using `python fetchUiTestBatch.py --limit 1`. The downloader reported
+video folder using `python scripts/fetchUiTestBatch.py --limit 1`. The downloader reported
 one verified clip ready and preserved the manifest and labels.
 
 In the isolated copy's browser UI, the example opened, release frame 176 was
@@ -43,7 +43,7 @@ MLB and personal labels, registered videos, and model files were preserved.
 ## Publication state
 
 The owner selected the MIT code license. The generated public folder and ZIP
-contain only `release-files.txt` entries plus their checksum manifest. They
+contain only `tools/release-files.txt` entries plus their checksum manifest. They
 exclude personal registrations, annotations, prediction reports, editor files,
 large weights, downloaded footage, and Git history. Nothing has been pushed,
 and the original repository history has not been rewritten.

@@ -18,8 +18,8 @@ it tests whether the relationship holds at extreme angles across cameras,
 rather than testing one pitcher in one stadium.
 
 Usage:
-    python fetchLowSlotBatch.py --dryRun
-    python fetchLowSlotBatch.py --maxArmAngle 10 --perPitcher 6
+    python scripts/fetchLowSlotBatch.py --dryRun
+    python scripts/fetchLowSlotBatch.py --maxArmAngle 10 --perPitcher 6
 """
 
 import argparse
@@ -30,7 +30,9 @@ import sys
 import numpy as np
 import pandas as pd
 
-import savantUtils
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # repo root
+
+from armangle import savantUtils
 from fetchPitchBatch import PREFERRED_DESCRIPTIONS, buildMeta
 
 

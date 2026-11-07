@@ -2,7 +2,7 @@
 .venv/
 
 # Broadcast clips -- 947 MB, 185 clips. Re-downloadable from Savant:
-#   fetchPitchBatch.py / fetchLowSlotBatch.py
+#   scripts/fetchPitchBatch.py / scripts/fetchLowSlotBatch.py
 # labels.csv keys on game_pk + play_id, so the labels survive without the video.
 pitches/
 releaseFrames/
@@ -18,7 +18,7 @@ models/
 *.npz
 
 # Ridge models are 2-3 KB and ARE tracked deliberately -- they are what
-# predictLabels.py and the labeler load. Do not add *.joblib here.
+# scripts/predictLabels.py and the labeler load. Do not add *.joblib here.
 
 # Diagnostic images and overlay dumps. Cheap to regenerate, expensive in git.
 logs/overlays/
@@ -33,15 +33,15 @@ __pycache__/
 # macOS
 .DS_Store
 
-# Savant /gf API response cache -- regenerated on demand by savantUtils.py.
+# Savant /gf API response cache -- regenerated on demand by armangle/savantUtils.py.
 cache/
 
 # Per-user working data. Each person who clones this gets their OWN footage,
 # their own annotations, and their own predictions -- none of it is shared state.
-# labelServer.py creates all of these on demand (readLabelFile / readLocalVideos
+# armangle/labelServer.py creates all of these on demand (readLabelFile / readLocalVideos
 # both return [] when the file is absent), so a fresh clone starts clean.
 #
-# labels.csv is the current development dataset. The shipped manual-v1 model
+# data/labels.csv is the current development dataset. The shipped manual-v1 model
 # was trained on the separate, immutable data/manual-v1/labels.csv snapshot.
 localVideos.json
 localLabels.csv

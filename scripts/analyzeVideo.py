@@ -1,13 +1,13 @@
 """
 Run the Phase 4 pipeline over an arbitrary video and draw what it saw.
 
-predictAngle.py is the pipeline for MLB clips shot from the centre-field camera, where
+scripts/predictAngle.py is the pipeline for MLB clips shot from the centre-field camera, where
 detect.choosePerson reliably finds the pitcher. On any other footage that rule is not
 safe -- it is built around "on a centre-field shot the pitcher is nearest the camera" --
 so this script lets you say which person is the pitcher with --anchor, and always writes
 an annotated frame so the keypoints can be judged by eye rather than trusted.
 
-    ./.venv/bin/python analyzeVideo.py --video reel.mp4 --frames 402,403,404 \
+    ./.venv/bin/python scripts/analyzeVideo.py --video reel.mp4 --frames 402,403,404 \
         --anchor 1000,600 --p-throws R --out overlays
 
 The angle it prints is only meaningful if the camera looks along the pitcher->home axis.
@@ -23,11 +23,13 @@ import sys
 import cv2
 import numpy as np
 
-import features
-import angleInputs
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # repo root
+
+from armangle import features
+from armangle import angleInputs
 from phase4 import buildDataset, dataset, detect
 
-PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CROP_SIDE = 1.6
 
 COLORS = {"shoulder": (255, 80, 80), "off_shoulder": (80, 160, 255),
@@ -93,7 +95,7 @@ def main():
     parser.add_argument("--anchor", help="x,y of the pitcher, to override Stage A")
     parser.add_argument("--p-throws", default="R")
     parser.add_argument("--model", default=os.path.join(PROJECT_DIR, "phase4", "keypoints.pt"))
-    parser.add_argument("--ridge", default=os.path.join(PROJECT_DIR, "armAngleModel.joblib"))
+    parser.add_argument("--ridge", default=os.path.join(PROJECT_DIR, "model", "armAngleModel.joblib"))
     parser.add_argument("--out", default="overlays")
     args = parser.parse_args()
 

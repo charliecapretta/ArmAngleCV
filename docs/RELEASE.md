@@ -19,7 +19,7 @@ python tools/prepareRelease.py --out release/public
 The build creates `release/public/`, `release/public.zip`, and a checksummed
 `RELEASE_CONTENTS.json` inside the copy. It refuses to overwrite an existing
 output. Use a new directory name for a later revision. Every included file is
-listed explicitly in `release-files.txt`; unlisted files are not copied.
+listed explicitly in `tools/release-files.txt`; unlisted files are not copied.
 
 Included: manual application, example manifest and downloader, original small
 Ridge artifacts, exact frozen training snapshot, current development labels,

@@ -15,7 +15,7 @@ College, high-school, side-view, and recruiting-reel accuracy is unverified.
 | Item | Value |
 |---|---|
 | Release identifier | `manual-v1` |
-| Default model | `armAngleModelResolutionSafe.joblib` |
+| Default model | `model/armAngleModelResolutionSafe.joblib` |
 | Training snapshot | `data/manual-v1/labels.csv` |
 | Snapshot size | 184 rows: 180 complete labels, 4 skipped |
 | Coverage | 98 pitchers, 30 parks |
@@ -26,13 +26,13 @@ College, high-school, side-view, and recruiting-reel accuracy is unverified.
 The training snapshot is an exact byte-for-byte copy of the original source
 file identified by the shipped model's embedded training checksum. Model files
 have not been retrained or replaced during release preparation. Checksums and
-evaluation metadata are in [model-manifest.json](model-manifest.json).
+evaluation metadata are in [model-manifest.json](../model/model-manifest.json).
 
-The root `labels.csv` is the separate `development-2026-09-09` snapshot: 196 rows,
+`data/labels.csv` is the separate `development-2026-09-09` snapshot: 196 rows,
 192 complete labels, 103 pitchers, 30 parks. It contains 12 later complete labels.
 Its current cross-validation result must not be presented as the released model's
 training-set size or as an independent test of that model. The original
-`armAngleModel.joblib` remains available for legacy raw-pixel inference; it is
+`model/armAngleModel.joblib` remains available for legacy raw-pixel inference; it is
 not the manual UI's default.
 
 ## Development validation
@@ -58,7 +58,7 @@ reflect different datasets and input conventions, not a new model release.
 Reproduce the release evaluation:
 
 ```bash
-python evaluateAngleInputs.py --labels data/manual-v1/labels.csv --out reports/reproduced-manual-v1
+python scripts/evaluateAngleInputs.py --labels data/manual-v1/labels.csv --out reports/reproduced-manual-v1
 python tools/checkRelease.py
 ```
 
@@ -87,4 +87,4 @@ be saved as occluded, but cannot produce a five-point model estimate.
   separate from this manual model's accuracy.
 
 See [DATA_SOURCES.md](DATA_SOURCES.md) for attribution and
-[docs/RESEARCH.md](docs/RESEARCH.md) for experimental workflows.
+[docs/RESEARCH.md](RESEARCH.md) for experimental workflows.

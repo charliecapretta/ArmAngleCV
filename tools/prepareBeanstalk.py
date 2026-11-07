@@ -64,7 +64,7 @@ def build(out, include_examples=False, example_count=None, ffprobe=None, ffprobe
         entries = []
         # Only this explicit MLB practice batch is authorized for inclusion.
         # Do not traverse uploads, research folders, or local user registrations.
-        pitches = json.loads((ROOT / 'uiTestBatch.json').read_text())['pitches']
+        pitches = json.loads((ROOT / 'data' / 'uiTestBatch.json').read_text())['pitches']
         if example_count is not None:
             if not 1 <= example_count <= len(pitches):
                 raise ValueError(f'Choose between 1 and {len(pitches)} examples.')

@@ -32,7 +32,7 @@ import pandas as pd
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import features
+from armangle import features
 from phase4 import detect
 
 PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -77,7 +77,7 @@ def main():
     args = parser.parse_args()
 
     cache = detect.load()
-    labels = pd.read_csv(os.path.join(PROJECT_DIR, "labels.csv"))
+    labels = pd.read_csv(os.path.join(PROJECT_DIR, "data", "labels.csv"))
     labels = labels[labels["status"] == "labeled"]
 
     frames = pd.read_csv(os.path.join(PROJECT_DIR, "releaseFrames", "frames.csv"))

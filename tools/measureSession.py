@@ -69,7 +69,7 @@ def measureSession(output=None, baseline=False):
         if baseline:
             import hosted.video
             hosted.video.prepare = prepareBaseline
-        pitches = sorted(json.loads((ROOT/'uiTestBatch.json').read_text())['pitches'], key=lambda p:p['armAngle'])
+        pitches = sorted(json.loads((ROOT/'data'/'uiTestBatch.json').read_text())['pitches'], key=lambda p:p['armAngle'])
         selected = [pitches[round(i*(len(pitches)-1)/4)] for i in range(5)]
         for i, pitch in enumerate(selected):
             source = ROOT/'pitches'/f"{pitch['gamePk']}_{pitch['playId']}"/'clip.mp4'

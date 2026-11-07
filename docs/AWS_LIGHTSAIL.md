@@ -1,6 +1,6 @@
 # Arm Angle CV: $7 Lightsail private beta
 
-The hosted entry point is `hosted.app:create_app()`. The existing `python labelServer.py`
+The hosted entry point is `hosted.app:create_app()`. The existing `python -m armangle`
 command remains the local, single-user app. Do not expose the local server to the internet.
 The hosted app uses the same frozen manual-v1 model and shared point validation.
 
@@ -159,7 +159,7 @@ placed, so the practice run ends in a comparison against a known answer. Uploads
 such reference and still show none.
 
 Serving a clip here publishes it to every visitor, which is not what the downloader in
-`fetchUiTestBatch.py` retrieves footage for. Confirm you may redistribute a clip before
+`scripts/fetchUiTestBatch.py` retrieves footage for. Confirm you may redistribute a clip before
 installing it, and remove it with `example remove --slug` if that changes.
 
 ## 5. Verify before inviting friends

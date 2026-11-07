@@ -32,8 +32,8 @@ import pandas as pd
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import features
-from AnglePredictor import cross_val_predictions, make_model, score  # noqa: F401
+from armangle import features
+from armangle.AnglePredictor import cross_val_predictions, make_model, score  # noqa: F401
 
 PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FRAMES_DIR = os.path.join(PROJECT_DIR, "releaseFrames")
@@ -51,7 +51,7 @@ BODY_POINTS = ["shoulder", "off_shoulder", "elbow", "wrist"]
 
 def loadRows(limit=None):
     """Labeled pitches joined to their extracted release frame."""
-    labels = pd.read_csv(os.path.join(PROJECT_DIR, "labels.csv"))
+    labels = pd.read_csv(os.path.join(PROJECT_DIR, "data", "labels.csv"))
     labels = labels[labels["status"] == "labeled"].copy()
 
     frames = pd.read_csv(os.path.join(FRAMES_DIR, "frames.csv"))

@@ -1,7 +1,7 @@
 {
   "release": "manual-v1",
   "python": "3.12",
-  "model": "armAngleModelResolutionSafe.joblib",
+  "model": "model/armAngleModelResolutionSafe.joblib",
   "training_labels": "data/manual-v1/labels.csv",
   "training": {
     "n": 180,
@@ -52,16 +52,16 @@
     "limits": "Development comparison on existing MLB labels. Park folds can share pitchers. Uniform scaling is not a change of camera view, crop, zoom, or temporal sampling. No college ground truth or college fitting."
   },
   "development_labels": {
-    "path": "labels.csv",
+    "path": "data/labels.csv",
     "snapshot": "development-2026-09-09",
     "complete_labels": 192,
     "pitchers": 103,
     "parks": 30
   },
   "sha256": {
-    "armAngleModelResolutionSafe.joblib": "094bd8f827ee832c8e6f8d5422056b554c3100f12fd6941babaf922cac952c42",
-    "armAngleModel.joblib": "28b07b2dc0778a5cdf39e4aad846c28f722984bcd1c4a7e8c486b7a61d85bd01",
+    "model/armAngleModelResolutionSafe.joblib": "094bd8f827ee832c8e6f8d5422056b554c3100f12fd6941babaf922cac952c42",
+    "model/armAngleModel.joblib": "28b07b2dc0778a5cdf39e4aad846c28f722984bcd1c4a7e8c486b7a61d85bd01",
     "data/manual-v1/labels.csv": "b7bcda8d536af227c58f109d57fdfe4a494e3e450e4a3329d0773da85393a02e",
-    "labels.csv": "99945bc78516ba48b32db79519ff00502be528d227e6acf65e662aa680ad0db4"
+    "data/labels.csv": "99945bc78516ba48b32db79519ff00502be528d227e6acf65e662aa680ad0db4"
   }
 }

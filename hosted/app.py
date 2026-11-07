@@ -24,9 +24,9 @@ from werkzeug.exceptions import HTTPException, TooManyRequests, RequestEntityToo
 from werkzeug.security import check_password_hash
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-import analysisExport
-import angleInputs
-import labelServer
+from armangle import analysisExport
+from armangle import angleInputs
+from armangle import labelServer
 from hosted.video import MAX_BYTES, MAX_FRAME_BYTES
 from hosted import example, storage
 
@@ -187,9 +187,9 @@ def create_app(config=None):
                            parsed_origin.path or parsed_origin.query or parsed_origin.fragment or
                            parsed_origin.username or parsed_origin.password):
         raise RuntimeError('ARMANGLE_ORIGIN must be the public https:// address.')
-    manifest = json.loads((ROOT / 'model-manifest.json').read_text())
+    manifest = json.loads((ROOT / 'model' / 'model-manifest.json').read_text())
     model_path = ROOT / angleInputs.DEFAULT_MODEL
-    if hashlib.sha256(model_path.read_bytes()).hexdigest() != manifest['sha256'][model_path.name]:
+    if hashlib.sha256(model_path.read_bytes()).hexdigest() != manifest['sha256'][angleInputs.DEFAULT_MODEL]:
         raise RuntimeError('The hosted model checksum does not match the release manifest.')
     bundle = labelServer.getManualAngleBundle()
     if bundle.get('features') != angleInputs.columns(bundle.get('feature_mode')):
@@ -364,7 +364,7 @@ def create_app(config=None):
         example_count = min(5, len(example.available(root))) if app.config['EXAMPLES_ENABLED'] else 0
         if example_count:
             hosted_attributes += f' data-example="true" data-example-count="{example_count}"'
-        html = (ROOT / 'labelTool.html').read_text().replace('data-workspace="training"', hosted_attributes)
+        html = (ROOT / 'web' / 'labelTool.html').read_text().replace('data-workspace="training"', hosted_attributes)
         html = html.replace('</head>', '<meta name="csrf-token" content="' + csrf() + '"></head>')
         html = html.replace('</header>', '<a href="/account">' + ('My uploads' if anonymous else 'My account') + '</a> <a href="/privacy">Privacy &amp; data</a></header>')
         if (root / 'uploads.paused').exists():
@@ -396,7 +396,7 @@ def create_app(config=None):
     @app.get('/labelTool.js')
     def asset():
         name = request.path[1:]
-        response = send_file(ROOT / name, conditional=True, max_age=31536000)
+        response = send_file(ROOT / 'web' / name, conditional=True, max_age=31536000)
         response.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
         return response
 

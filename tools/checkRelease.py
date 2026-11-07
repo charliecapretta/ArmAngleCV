@@ -12,13 +12,11 @@ import pandas as pd
 from joblib import load
 from sklearn.model_selection import GroupKFold
 
-from AnglePredictor import make_model
-import angleInputs
-import features
-
-
+from armangle.AnglePredictor import make_model
+from armangle import angleInputs
+from armangle import features
 def main():
-    manifest = json.loads((ROOT/'model-manifest.json').read_text())
+    manifest = json.loads((ROOT/'model'/'model-manifest.json').read_text())
     for path, expected in manifest['sha256'].items():
         actual = hashlib.sha256((ROOT/path).read_bytes()).hexdigest()
         if actual != expected:

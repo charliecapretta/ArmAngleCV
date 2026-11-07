@@ -5,9 +5,8 @@ import math
 import os
 import uuid
 
-import angleInputs
-import features
-
+from armangle import angleInputs
+from armangle import features
 MODEL_VERSION = 'manual-v1'
 ESTIMATE_SCOPE = ('Estimated arm angle from an MLB-trained model. '
                   'Accuracy on college footage has not been established.')

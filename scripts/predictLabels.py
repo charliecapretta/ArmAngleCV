@@ -1,7 +1,7 @@
 """Predict angles from saved hand labels without running automatic point detection.
 
-    ./.venv/bin/python predictLabels.py --labels localLabels.csv
-    ./.venv/bin/python predictLabels.py --model armAngleModel.joblib --out oldPredictions.csv
+    ./.venv/bin/python scripts/predictLabels.py --labels localLabels.csv
+    ./.venv/bin/python scripts/predictLabels.py --model model/armAngleModel.joblib --out oldPredictions.csv
 """
 import argparse
 import csv
@@ -9,12 +9,14 @@ from pathlib import Path
 from collections import defaultdict
 import numpy as np
 from joblib import load
-import angleInputs
-import features
+import os
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # repo root
 
-
+from armangle import angleInputs
+from armangle import features
 def main():
-    root = Path(__file__).resolve().parent
+    root = Path(__file__).resolve().parents[1]
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--labels', default=str(root/'localLabels.csv'))
     parser.add_argument('--model', default=str(root/angleInputs.DEFAULT_MODEL))

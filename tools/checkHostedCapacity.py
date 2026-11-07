@@ -15,7 +15,7 @@ sys.path.insert(0, str(ROOT))
 def measure():
     import cv2
     import numpy as np
-    import labelServer
+    from armangle import labelServer
     cv2.setNumThreads(1)
     labelServer.getManualAngleBundle()
     with tempfile.TemporaryDirectory(prefix='armangle-capacity-') as tmp:

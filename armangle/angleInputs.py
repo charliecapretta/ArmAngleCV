@@ -8,11 +8,10 @@ import sys
 
 import numpy as np
 
-import features
-
+from armangle import features
 MODES = ('raw', 'height720', 'angles_only', 'body_relative')
 DEFAULT_MODE = 'height720'
-DEFAULT_MODEL = 'armAngleModelResolutionSafe.joblib'
+DEFAULT_MODEL = 'model/armAngleModelResolutionSafe.joblib'
 
 
 def columns(mode):

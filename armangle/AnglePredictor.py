@@ -2,8 +2,8 @@
 Predict Statcast arm_angle from hand-labeled broadcast keypoints.
 
 Terminal stage of the pipeline:
-    fetchPitchBatch.py / fetchLowSlotBatch.py  ->  pitches/
-    labelServer.py + labelTool.html            ->  labels.csv
+    scripts/fetchPitchBatch.py, scripts/fetchLowSlotBatch.py  ->  pitches/
+    labelServer.py + labelTool.html            ->  data/labels.csv
     AnglePredictor.py                          ->  this
 
 Two things this reports, and the second is the point:
@@ -20,9 +20,9 @@ geometry. Measured on this data: a random 80/20 split leaves 67% of the test
 set contaminated, and it flatters RandomForest from RMSE 10.3 to 3.3.
 
 Usage:
-    python AnglePredictor.py
-    python AnglePredictor.py --loo          # leave-one-pitcher-out (strictest)
-    python AnglePredictor.py --save model.joblib
+    python -m armangle.AnglePredictor
+    python -m armangle.AnglePredictor --loo          # leave-one-pitcher-out (strictest)
+    python -m armangle.AnglePredictor --save model.joblib
 """
 
 import argparse
@@ -37,7 +37,7 @@ from sklearn.preprocessing import StandardScaler
 
 # Features, target and group key all live in features.py so that evaluation here
 # and inference on predicted keypoints cannot drift apart.
-from features import (ANGLE_MAX, ANGLE_MIN, FEATURE_COLS, GROUP_COL,  # noqa: E402
+from armangle.features import (ANGLE_MAX, ANGLE_MIN, FEATURE_COLS, GROUP_COL,  # noqa: E402
                       TARGET_COL)
 
 
@@ -162,7 +162,7 @@ def report(data, predictions):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--labels", default="labels.csv")
+    parser.add_argument("--labels", default="data/labels.csv")
     parser.add_argument("--splits", type=int, default=8)
     parser.add_argument("--loo", action="store_true",
                         help="leave-one-pitcher-out: strictest, one fold per pitcher")

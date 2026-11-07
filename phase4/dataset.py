@@ -121,7 +121,7 @@ def toPixels(normalized, transforms):
 
 def coordDict(pixels):
     """One row of N x 5 x 2 pixels -> the {name}_{x,y} dict features.py expects."""
-    import features
+    from armangle import features
     coords = {}
     for index, name in enumerate(features.KEYPOINT_NAMES):
         coords[f"{name}_x"] = float(pixels[index][0])
