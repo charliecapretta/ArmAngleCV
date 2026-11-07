@@ -27,8 +27,8 @@ from sklearn.model_selection import GroupKFold
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import features
-from AnglePredictor import cross_val_predictions, score
+from armangle import features
+from armangle.AnglePredictor import cross_val_predictions, score
 from phase4 import dataset, keypointModel
 
 HAND_CLICKED_RMSE = 2.651   # hand-clicked everything -> Ridge, the ceiling

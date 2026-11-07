@@ -4,10 +4,8 @@ import sys
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 import unittest
 import numpy as np
-import angleInputs
-import features
-
-
+from armangle import angleInputs
+from armangle import features
 class LinearProbe:
     # Scaled to land in the plausible arm-angle range. Predictions are now clamped to
     # [-90, 90], so an unscaled probe (~60000 on this row) would saturate at the rail

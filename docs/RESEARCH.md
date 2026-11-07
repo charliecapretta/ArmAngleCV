@@ -29,7 +29,7 @@ the released model or label snapshot.
 The current development dataset can be evaluated separately:
 
 ```bash
-python AnglePredictor.py
+python -m armangle.AnglePredictor
 python scripts/evaluateAngleInputs.py --out reports/reproduced-development
 ```
 

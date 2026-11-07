@@ -9,11 +9,11 @@ import tempfile
 import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # repo root
 
-import savantUtils as s
-from labelServer import probeClip
+from armangle import savantUtils as s
+from armangle.labelServer import probeClip
 
 ROOT = Path(__file__).resolve().parents[1]
-BATCH = ROOT / 'uiTestBatch.json'
+BATCH = ROOT / 'data' / 'uiTestBatch.json'
 
 
 def manifestPitches(path):

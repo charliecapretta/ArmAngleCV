@@ -44,8 +44,8 @@ about **2.65° RMSE** against Statcast on pitchers the model never saw.
 | Step | Where | Writes |
 |---|---|---|
 | Fetch MLB examples *(optional)* | `scripts/fetchUiTestBatch.py` | `pitches/` |
-| Label and analyze | `labelServer.py` + `index.html` | `analysisLabels.csv` |
-| Predict | `angleInputs.py` + `model/armAngleModelResolutionSafe.joblib` | in-app estimate |
+| Label and analyze | `armangle/labelServer.py` + `web/` | `analysisLabels.csv` |
+| Predict | `armangle/angleInputs.py` + `model/armAngleModelResolutionSafe.joblib` | in-app estimate |
 | Export | **Export session CSV** / `scripts/predictLabels.py` | session CSV |
 | Retrain and evaluate | `scripts/evaluateAngleInputs.py` | `reports/` |
 | Verify release | `tools/checkRelease.py` | — |
@@ -58,7 +58,7 @@ Use **Python 3.12**. No GPU or neural-network weights are needed.
 python3.12 -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
-python labelServer.py
+python -m armangle
 ```
 
 Open **http://127.0.0.1:8777/index.html** and choose **Upload a video** or **Try MLB examples**.
@@ -115,7 +115,7 @@ Details are in the [model card](docs/MODEL_CARD.md).
 | `data/manual-v1/labels.csv` | Frozen 184-row snapshot the shipped model was trained on. Do not edit. |
 | `data/labels.csv` | Current development labels (192 complete, 103 pitchers). |
 | `data/savant_data.csv` | Baseball Savant export, Aug 10–16, 2026, used to select pitches. |
-| `uiTestBatch.json` | Identifiers for the 12 MLB example clips. |
+| `data/uiTestBatch.json` | Identifiers for the 12 MLB example clips. |
 | `analysisLabels.csv` | *Yours, created locally.* Saved analyses; git-ignored. |
 
 Arm-angle targets and pitch metadata come from [Baseball Savant](https://baseballsavant.mlb.com/).
@@ -127,10 +127,11 @@ This project is not affiliated with or endorsed by MLB.
 
 ```
 ArmAngleCV/
-├── labelServer.py        # local app server — start here
-├── index.html, labelTool.*, workspace.css   # browser UI
-├── angleInputs.py, features.py, AnglePredictor.py   # model inputs and estimator
-├── analysisExport.py, videoUploads.py, savantUtils.py, releaseTiming.py
+├── armangle/             # core package — `python -m armangle` starts the local app
+│   ├── labelServer.py        # local server and API
+│   ├── angleInputs.py, features.py, AnglePredictor.py   # model inputs and estimator
+│   └── analysisExport.py, videoUploads.py, savantUtils.py, releaseTiming.py
+├── web/                  # browser UI: labelTool.html, labelTool.js, workspace.css
 ├── scripts/              # command-line tools: fetch clips, predict, evaluate
 ├── model/                # shipped ridge models + checksummed manifest
 ├── data/                 # labels, frozen manual-v1 snapshot, Statcast export

@@ -31,9 +31,11 @@ class FirstRunTest(unittest.TestCase):
 
         with tempfile.TemporaryDirectory(prefix='armangle-smoke-') as tmp:
             root = Path(tmp)
-            for name in ['labelServer.py', 'savantUtils.py', 'features.py', 'angleInputs.py',
-                         'scripts/predictLabels.py', 'analysisExport.py', 'videoUploads.py', 'model/armAngleModelResolutionSafe.joblib',
-                         'index.html', 'labelTool.html', 'labelTool.js', 'workspace.css']:
+            for name in ['armangle/__init__.py', 'armangle/__main__.py', 'armangle/labelServer.py',
+                         'armangle/savantUtils.py', 'armangle/features.py', 'armangle/angleInputs.py',
+                         'scripts/predictLabels.py', 'armangle/analysisExport.py', 'armangle/videoUploads.py',
+                         'model/armAngleModelResolutionSafe.joblib',
+                         'web/labelTool.html', 'web/labelTool.js', 'web/workspace.css']:
                 (root/name).parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(ROOT/name, root/name)
             (root/'sitecustomize.py').write_text('''import importlib.abc, sys
@@ -57,7 +59,7 @@ sys.meta_path.insert(0, BlockOptional())
             env = {**os.environ, 'PYTHONPATH': str(root), 'PYTHONUNBUFFERED': '1'}
             logPath = root/'server.log'
             with logPath.open('w+') as log:
-                process = subprocess.Popen([sys.executable, str(root/'labelServer.py'), '0'],
+                process = subprocess.Popen([sys.executable, '-m', 'armangle', '0'],
                                            cwd=root, env=env, stdout=subprocess.PIPE,
                                            stderr=log, text=True)
                 lines = queue.Queue()

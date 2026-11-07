@@ -1,6 +1,6 @@
 import math
 import unittest
-from releaseTiming import flightSeconds, timeAtY, releaseFrameFromArrival, speedOnlyFlightSeconds
+from armangle.releaseTiming import flightSeconds, timeAtY, releaseFrameFromArrival, speedOnlyFlightSeconds
 
 class TimingTest(unittest.TestCase):
     def test_constant_speed_matches_distance(self):

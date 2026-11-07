@@ -5,9 +5,7 @@ from unittest.mock import patch
 
 import cv2
 import numpy as np
-import videoUploads
-
-
+from armangle import videoUploads
 class VideoUploadsTest(unittest.TestCase):
     def test_real_mp4_and_decoded_limits(self):
         with tempfile.TemporaryDirectory() as folder:

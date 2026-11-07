@@ -24,7 +24,7 @@ from sklearn.model_selection import GroupKFold
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import features
+from armangle import features
 from phase4 import dataset, evaluate, keypointModel
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -63,7 +63,7 @@ def main():
             {"size": args.size, "epochs": args.epochs, "seed": args.seed})
         frame = evaluate.featureFrame(dataset.toPixels(outOfFold, transforms), index)
 
-        from AnglePredictor import make_model
+        from armangle.AnglePredictor import make_model
         ridge = make_model().fit(frame[features.FEATURE_COLS].values,
                                  frame[features.TARGET_COL].values.astype(float))
         dump({"model": ridge, "features": features.FEATURE_COLS,

@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def releaseFiles(root):
-    names = [line.strip() for line in (root/'release-files.txt').read_text().splitlines()
+    names = [line.strip() for line in (root/'tools'/'release-files.txt').read_text().splitlines()
              if line.strip() and not line.lstrip().startswith('#')]
     if len(names) != len(set(names)):
         raise ValueError('Duplicate path in release-files.txt')

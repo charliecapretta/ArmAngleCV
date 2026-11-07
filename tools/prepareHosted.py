@@ -6,9 +6,10 @@ from pathlib import Path
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
-FILES = ['requirements.txt', 'requirements-hosted.txt', 'labelServer.py', 'savantUtils.py',
-         'features.py', 'angleInputs.py', 'analysisExport.py', 'videoUploads.py',
-         'model/armAngleModelResolutionSafe.joblib', 'labelTool.html', 'labelTool.js', 'workspace.css',
+FILES = ['requirements.txt', 'requirements-hosted.txt', 'armangle/__init__.py', 'armangle/labelServer.py',
+         'armangle/savantUtils.py', 'armangle/features.py', 'armangle/angleInputs.py',
+         'armangle/analysisExport.py', 'armangle/videoUploads.py',
+         'model/armAngleModelResolutionSafe.joblib', 'web/labelTool.html', 'web/labelTool.js', 'web/workspace.css',
          'LICENSE', 'docs/MODEL_CARD.md', 'model/model-manifest.json', 'docs/AWS_LIGHTSAIL.md',
          'tools/checkHostedCapacity.py', 'docs/HOSTED_TEST_REVIEW.md', 'docs/S3_SETUP.md', 'docs/PRIVACY_STORAGE.md']
 FILES += ['hosted/' + p for p in ['__init__.py','app.py','video.py','storage.py','example.py','manage.py','backups.py','deletions.py','account.js','templates/login.html','templates/account.html','templates/privacy.html']]

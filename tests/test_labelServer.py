@@ -8,7 +8,7 @@ from unittest.mock import patch
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
-import labelServer as server
+from armangle import labelServer as server
 import extractReleaseFrames
 
 
@@ -121,7 +121,7 @@ class LabelsTest(unittest.TestCase):
         before = Path(server.LABELS_PATH).read_bytes()
         r = self.row(); r['img_h'] = 9999
         with patch.object(server, 'manualAngleBundle', {'feature_mode':'height720'}), \
-             patch('angleInputs.predict', return_value=[12.5]) as prediction:
+             patch('armangle.angleInputs.predict', return_value=[12.5]) as prediction:
             result = server.predictManualAngle(r)
             self.assertEqual(result['predicted_arm_angle'], 12.5)
             self.assertEqual(prediction.call_args.args[1][0]['img_h'], 720)

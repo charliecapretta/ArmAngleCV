@@ -15,11 +15,9 @@ import os
 import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # repo root
 
-from AnglePredictor import make_model
-import features
-import angleInputs
-
-
+from armangle.AnglePredictor import make_model
+from armangle import features
+from armangle import angleInputs
 def rescale(row, factor):
     row = dict(row)
     for key in features.COORD_COLS + ['img_w', 'img_h']:

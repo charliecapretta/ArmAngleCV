@@ -15,7 +15,7 @@ import numpy as np
 import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # repo root
 
-from releaseTiming import flightSeconds, speedOnlyFlightSeconds, releaseFrameFromArrival
+from armangle.releaseTiming import flightSeconds, speedOnlyFlightSeconds, releaseFrameFromArrival
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / 'reports/release_detection'

@@ -26,8 +26,7 @@ import pandas as pd
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # repo root
 
-import savantUtils
-
+from armangle import savantUtils
 DEFAULT_STATCAST_CSV = os.path.join(savantUtils.PROJECT_DIR, "data", "savant_data.csv")
 
 # Pitches where the broadcast holds on the delivery rather than cutting to the ball.

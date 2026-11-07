@@ -1,6 +1,6 @@
 # Arm Angle CV: $7 Lightsail private beta
 
-The hosted entry point is `hosted.app:create_app()`. The existing `python labelServer.py`
+The hosted entry point is `hosted.app:create_app()`. The existing `python -m armangle`
 command remains the local, single-user app. Do not expose the local server to the internet.
 The hosted app uses the same frozen manual-v1 model and shared point validation.
 

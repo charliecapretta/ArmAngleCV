@@ -43,7 +43,7 @@ MLB and personal labels, registered videos, and model files were preserved.
 ## Publication state
 
 The owner selected the MIT code license. The generated public folder and ZIP
-contain only `release-files.txt` entries plus their checksum manifest. They
+contain only `tools/release-files.txt` entries plus their checksum manifest. They
 exclude personal registrations, annotations, prediction reports, editor files,
 large weights, downloaded footage, and Git history. Nothing has been pushed,
 and the original repository history has not been rewritten.

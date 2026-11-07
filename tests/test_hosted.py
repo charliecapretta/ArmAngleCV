@@ -109,8 +109,8 @@ class HostedTest(unittest.TestCase):
     def test_workflow_isolation_restart_and_backup(self):
         from hosted.app import create_app, connect
         from hosted.manage import backup, restore
-        import angleInputs
-        import labelServer
+        from armangle import angleInputs
+        from armangle import labelServer
         p = self.upload()
         self.assertNotIn('sourcePath',p)
         directory=p['dirName']
@@ -164,7 +164,7 @@ class HostedTest(unittest.TestCase):
     def test_auth_csrf_allowlist_and_login_limit(self):
         guest=self.app.test_client()
         self.assertEqual(guest.get('/api/pitches').status_code,401)
-        for path in ('/labelServer.py','/data/labels.csv','/.git/config','/uploads/test.mp4','/labelTool.html','/api/pose','/api/ball','/api/prefetch'):
+        for path in ('/armangle/labelServer.py','/data/labels.csv','/.git/config','/uploads/test.mp4','/labelTool.html','/api/pose','/api/ball','/api/prefetch'):
             self.assertEqual(self.alice.get(path).status_code,404,path)
         self.assertEqual(self.alice.post('/api/import',json={}).status_code,403)
         self.assertEqual(self.post(self.alice,self.a,'/api/import',dict(path='/etc/passwd')).status_code,400)

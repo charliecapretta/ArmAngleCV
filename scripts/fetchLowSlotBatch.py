@@ -32,7 +32,7 @@ import pandas as pd
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # repo root
 
-import savantUtils
+from armangle import savantUtils
 from fetchPitchBatch import PREFERRED_DESCRIPTIONS, buildMeta
 
 

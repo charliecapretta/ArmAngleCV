@@ -32,7 +32,7 @@ import pandas as pd
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import features
+from armangle import features
 from phase4 import detect
 
 PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

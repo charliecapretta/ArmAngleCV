@@ -26,8 +26,8 @@ import cv2
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # repo root
 
-import savantUtils
-from labelServer import clipPathFor
+from armangle import savantUtils
+from armangle.labelServer import clipPathFor
 
 OUT_DIR = os.path.join(savantUtils.PROJECT_DIR, "releaseFrames")
 

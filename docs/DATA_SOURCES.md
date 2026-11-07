@@ -15,7 +15,7 @@ See [MODEL_CARD.md](MODEL_CARD.md) for snapshot counts and intended use.
 
 ## Video
 
-No MLB broadcast video is included in the public file set. `uiTestBatch.json`
+No MLB broadcast video is included in the public file set. `data/uiTestBatch.json`
 records the fixed example identifiers and source metadata. The optional downloader
 retrieves clips from their Baseball Savant pages for local use. Availability can
 change. Keep attribution with any externally sourced material and consult its

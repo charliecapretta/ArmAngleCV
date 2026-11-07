@@ -8,12 +8,12 @@ The hosted preparation is separate from the currently running local app.
 
 ## Framework and current storage
 
-- Browser: plain HTML/CSS and vanilla JavaScript, no React/Next.js. `labelTool.html`
-  provides the file picker. `labelTool.js:sendVideo` sends the raw File through XHR
+- Browser: plain HTML/CSS and vanilla JavaScript, no React/Next.js. `web/labelTool.html`
+  provides the file picker. `web/labelTool.js:sendVideo` sends the raw File through XHR
   to `POST /api/upload?filename=...&sessionName=...&pitcherName=...&pThrows=...`.
   Upload progress uses `xhr.upload.onprogress`; the response must be JSON `{ok,pitch}`.
 - Local backend: Python standard-library `ThreadingHTTPServer` and
-  `SimpleHTTPRequestHandler`, in `labelServer.py`. It streams chunks to
+  `SimpleHTTPRequestHandler`, in `armangle/labelServer.py`. It streams chunks to
   `<project>/uploads/<uuid>.mp4`, validates with OpenCV, and registers the local path
   as `sourcePath` in `localVideos.json`. Analyses live in `analysisLabels.csv`.
 - Hosted backend being prepared: Flask + Gunicorn, `hosted/app.py`. Originals live

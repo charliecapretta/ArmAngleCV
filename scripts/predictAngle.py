@@ -28,9 +28,9 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # repo root
 
-import features
-import angleInputs
-import savantUtils
+from armangle import features
+from armangle import angleInputs
+from armangle import savantUtils
 from phase4 import buildDataset, dataset, detect
 
 PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
