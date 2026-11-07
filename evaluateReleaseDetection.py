@@ -19,7 +19,7 @@ OUT = ROOT / 'reports/release_detection'
 
 
 def joinedRows():
-    statcast = {(r['game_pk'],r['at_bat_number'],r['pitch_number']):r for r in csv.DictReader((ROOT/'savant_data (10).csv').open())}
+    statcast = {(r['game_pk'],r['at_bat_number'],r['pitch_number']):r for r in csv.DictReader((ROOT/'savant_data.csv').open())}
     feeds = {}
     for p in (ROOT/'cache/gf').glob('*.json'):
         data = json.loads(p.read_text())

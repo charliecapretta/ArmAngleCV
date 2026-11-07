@@ -83,7 +83,7 @@ Reproduce with `./.venv/bin/python AnglePredictor.py`.
 
 ### 1. `fetchPitchBatch.py` — pitches + ground truth
 
-Reads the local `savant_data (10).csv` (25,000 pitches, 2026-08-10→16, 412
+Reads the local `savant_data.csv` (25,000 pitches, 2026-08-10→16, 412
 pitchers, 93 games, 22 parks). No remote Statcast pull needed.
 
 Selection is stratified across `arm_angle` bin × park, capped per pitcher. At
@@ -218,7 +218,7 @@ MLB validation: 180 pitches, 98 pitchers; eight folds held out by pitcher.
 Original pixels: RMSE 2.651°, MAE 2.135°. Common height: RMSE 2.653°, MAE 2.137°.
 MLB is the verified accuracy reference; college labels are not true angle targets.
 The old `armAngleModel.joblib` and the automatic keypoint pipeline are preserved.
-See `reports/resolution_validation/report.md` for the input comparison and limits.
+See `reports/resolution_validation/validation.json` for the input comparison.
 
 The labeler accepts the closest available release frame, including blurred 30 fps
 footage. Optional **Release choice** and **Point clarity** fields persist uncertainty

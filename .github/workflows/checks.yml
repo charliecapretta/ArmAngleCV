@@ -38,7 +38,11 @@ jobs:
       - name: Build the public file set
         run: python tools/prepareRelease.py --out release/public
       - name: Build the Elastic Beanstalk source bundle
-        run: python tools/prepareBeanstalk.py --out release/beanstalk.zip
+        # CI only audits this bundle; it is never deployed. Production builds pass a vetted static ffprobe.
+        run: |
+          FFPROBE="$(readlink -f "$(command -v ffprobe)")"
+          python tools/prepareBeanstalk.py --out release/beanstalk.zip \
+            --ffprobe "$FFPROBE" --ffprobe-sha256 "$(sha256sum "$FFPROBE" | cut -d' ' -f1)"
       - name: Audit deployed dependencies for known vulnerabilities
         run: |
           python -m pip install pip-audit==2.10.1

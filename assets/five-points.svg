@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 400" role="img" aria-label="The five points clicked at release, and the measured arm angle">
+  <style>
+    .bg { fill: #f6f8fa; } .ink { fill: #1f2328; } .muted { fill: #59636e; }
+    .line { stroke: #1f2328; } .ref { stroke: #8c959f; } .body { fill: #d0d7de; }
+    .pt { fill: #0969da; stroke: #f6f8fa; } .num { fill: #ffffff; }
+    .arc { stroke: #bf8700; } .ang { fill: #9a6700; }
+    @media (prefers-color-scheme: dark) {
+      .bg { fill: #161b22; } .ink { fill: #f0f6fc; } .muted { fill: #9198a1; }
+      .line { stroke: #f0f6fc; } .ref { stroke: #656c76; } .body { fill: #30363d; }
+      .pt { fill: #4493f8; stroke: #161b22; } .arc { stroke: #d29922; } .ang { fill: #e3b341; }
+    }
+    text { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; }
+  </style>
+  <rect class="bg" width="900" height="400" rx="14"/>
+
+  <!-- schematic pitcher at release, center-field view -->
+  <g transform="translate(240 262) scale(0.82)">
+    <ellipse class="body" cx="-40" cy="-118" rx="30" ry="34"/>
+    <path class="body" d="M -110 -62 L 30 -62 L 18 70 L -98 70 Z"/>
+    <path class="body" d="M -92 70 L -112 140 L -86 140 L -60 80 Z M 0 70 L 30 140 L 56 140 L 22 70 Z"/>
+    <line class="ref" x1="-180" y1="-60" x2="330" y2="-60" stroke-width="2" stroke-dasharray="6 7"/>
+    <line class="line" x1="-110" y1="-60" x2="20" y2="-60" stroke-width="4" stroke-opacity="0.45"/>
+    <polyline class="line" points="20,-60 112,-108 175,-170" fill="none" stroke-width="5" stroke-linejoin="round"/>
+    <line class="line" x1="20" y1="-60" x2="203" y2="-196" stroke-width="1.5" stroke-dasharray="3 5"/>
+    <path class="arc" d="M 130 -60 A 110 110 0 0 0 108.3 -125.6" fill="none" stroke-width="4"/>
+    <text class="ang" x="138" y="-82" font-size="24" font-weight="700">θ</text>
+
+    <g stroke-width="3">
+      <circle class="pt" cx="20" cy="-60" r="15"/><text class="num" x="20" y="-54" font-size="16" font-weight="700" text-anchor="middle">1</text>
+      <circle class="pt" cx="-110" cy="-60" r="15"/><text class="num" x="-110" y="-54" font-size="16" font-weight="700" text-anchor="middle">2</text>
+      <circle class="pt" cx="112" cy="-108" r="15"/><text class="num" x="112" y="-102" font-size="16" font-weight="700" text-anchor="middle">3</text>
+      <circle class="pt" cx="175" cy="-170" r="15"/><text class="num" x="175" y="-164" font-size="16" font-weight="700" text-anchor="middle">4</text>
+      <circle class="pt" cx="203" cy="-196" r="15"/><text class="num" x="203" y="-190" font-size="16" font-weight="700" text-anchor="middle">5</text>
+    </g>
+  </g>
+
+  <g transform="translate(560 86)">
+    <text class="ink" font-size="21" font-weight="700">Click order at release</text>
+    <g font-size="17">
+      <text class="ink" y="44"><tspan font-weight="700">1</tspan>  Throwing shoulder</text>
+      <text class="ink" y="76"><tspan font-weight="700">2</tspan>  Opposite shoulder</text>
+      <text class="ink" y="108"><tspan font-weight="700">3</tspan>  Elbow</text>
+      <text class="ink" y="140"><tspan font-weight="700">4</tspan>  Wrist</text>
+      <text class="ink" y="172"><tspan font-weight="700">5</tspan>  Ball</text>
+    </g>
+    <text class="muted" y="222" font-size="15">θ = shoulder→ball angle vs. horizontal.</text>
+    <text class="muted" y="246" font-size="15">A ridge model on all five points refines it</text>
+    <text class="muted" y="270" font-size="15">toward the Statcast arm angle.</text>
+  </g>
+</svg>

@@ -34,7 +34,7 @@ labels.csv
 data/manual-v1/labels.csv
 armAngleModel.joblib
 armAngleModelResolutionSafe.joblib
-savant_data (10).csv
+savant_data.csv
 docs/RESEARCH.md
 docs/RESEARCH_HISTORY.md
 docs/RELEASE.md
@@ -119,9 +119,13 @@ reports/costHardening/before.json
 reports/costHardening/after.json
 reports/costHardening/nginxLimits.json
 reports/costHardening/precisionComparison.png
-
 hosted/deletions.py
 deploy/beanstalk/backup-prune.service
 deploy/beanstalk/backup-prune.timer
 docs/PRIVACY_STORAGE.md
 tests/test_privacy_storage.py
+CITATION.cff
+assets/banner.svg
+assets/five-points.svg
+assets/validation-light.png
+assets/validation-dark.png

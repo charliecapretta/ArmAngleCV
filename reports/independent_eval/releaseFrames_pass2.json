@@ -1,3 +1,0 @@
-{"pass":2,"criterion":"same rule as pass 1, re-derived from a step-1 strip over a fixed 170-185 window (194-209 for eval10) rather than the step-2 strip used in pass 1",
- "picks":{"eval01":180,"eval02":182,"eval03":172,"eval04":181,"eval05":179,
-          "eval06":181,"eval07":180,"eval08":177,"eval09":177,"eval10":201}}
