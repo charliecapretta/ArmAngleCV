@@ -1,5 +1,0 @@
-180 pitches, 98 pitchers, 30 parks
-model 'resnet', GroupKFold on pitcher_id, 5 folds
-
-  excluding 1 unlearnable crop(s) from training (kept in test)
-    epoch   1/100  loss 0.20028

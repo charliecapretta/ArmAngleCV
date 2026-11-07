@@ -5,7 +5,7 @@
 The arm-angle targets, pitch identifiers, pitcher information, and game metadata
 come from [Baseball Savant](https://baseballsavant.mlb.com/), MLB's Statcast service.
 The [Statcast CSV field reference](https://baseballsavant.mlb.com/csv-docs)
-documents the source fields. `savant_data (10).csv` is the local export used for
+documents the source fields. `savant_data.csv` is the local export used for
 development, spanning August 10–16, 2026. The source export, labels, and manifest
 are research inputs; this project is not affiliated with or endorsed by MLB.
 

@@ -26,7 +26,7 @@ import pandas as pd
 
 import savantUtils
 
-DEFAULT_STATCAST_CSV = os.path.join(savantUtils.PROJECT_DIR, "savant_data (10).csv")
+DEFAULT_STATCAST_CSV = os.path.join(savantUtils.PROJECT_DIR, "savant_data.csv")
 
 # Pitches where the broadcast holds on the delivery rather than cutting to the ball.
 PREFERRED_DESCRIPTIONS = {

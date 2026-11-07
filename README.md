@@ -1,4 +1,6 @@
-# Arm Angle
+# ArmAngleCV
+
+[![Checks](https://github.com/charliecapretta/ArmAngleCV/actions/workflows/checks.yml/badge.svg)](https://github.com/charliecapretta/ArmAngleCV/actions/workflows/checks.yml)
 
 A local tool for estimating a pitcher's release arm angle from manually marked
 video frames. Choose the release frame, click five points, then review, save,

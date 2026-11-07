@@ -34,7 +34,7 @@ labels.csv
 data/manual-v1/labels.csv
 armAngleModel.joblib
 armAngleModelResolutionSafe.joblib
-savant_data (10).csv
+savant_data.csv
 docs/RESEARCH.md
 docs/RESEARCH_HISTORY.md
 docs/RELEASE.md
