@@ -32,8 +32,9 @@ class FirstRunTest(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix='armangle-smoke-') as tmp:
             root = Path(tmp)
             for name in ['labelServer.py', 'savantUtils.py', 'features.py', 'angleInputs.py',
-                         'predictLabels.py', 'analysisExport.py', 'videoUploads.py', 'armAngleModelResolutionSafe.joblib',
+                         'scripts/predictLabels.py', 'analysisExport.py', 'videoUploads.py', 'model/armAngleModelResolutionSafe.joblib',
                          'index.html', 'labelTool.html', 'labelTool.js', 'workspace.css']:
+                (root/name).parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(ROOT/name, root/name)
             (root/'sitecustomize.py').write_text('''import importlib.abc, sys
 class BlockOptional(importlib.abc.MetaPathFinder):
@@ -51,7 +52,8 @@ sys.meta_path.insert(0, BlockOptional())
                 writer.write(frame)
             writer.release()
             original = b'game_pk,play_id,status\n123,training-record,skipped\n'
-            (root/'labels.csv').write_bytes(original)
+            (root/'data').mkdir()
+            (root/'data'/'labels.csv').write_bytes(original)
             env = {**os.environ, 'PYTHONPATH': str(root), 'PYTHONUNBUFFERED': '1'}
             logPath = root/'server.log'
             with logPath.open('w+') as log:
@@ -127,7 +129,7 @@ sys.meta_path.insert(0, BlockOptional())
                     saved = request('/api/labels?workspace=analysis')['labels'][0]
                     self.assertEqual(saved['status'], 'labeled')
                     self.assertEqual(saved['img_h'], '180')
-                    exported = subprocess.run([sys.executable, str(root/'predictLabels.py'),
+                    exported = subprocess.run([sys.executable, str(root/'scripts'/'predictLabels.py'),
                                                '--labels', str(root/'analysisLabels.csv'),
                                                '--out', str(root/'export.csv')],
                                               cwd=root, env=env, capture_output=True, text=True, timeout=30)
@@ -165,7 +167,7 @@ sys.meta_path.insert(0, BlockOptional())
                     self.assertEqual(sessionExport()[0]['predicted_arm_angle_deg'], '')
                     saved = request('/api/labels?workspace=analysis')['labels']
                     self.assertEqual(len(saved), 3)
-                    self.assertEqual((root/'labels.csv').read_bytes(), original)
+                    self.assertEqual((root/'data'/'labels.csv').read_bytes(), original)
                     self.assertFalse((root/'localLabels.csv').exists())
                     self.assertFalse((root/'yolo11n-pose.pt').exists())
                 finally:

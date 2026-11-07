@@ -8,8 +8,8 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[1]
 FILES = ['requirements.txt', 'requirements-hosted.txt', 'labelServer.py', 'savantUtils.py',
          'features.py', 'angleInputs.py', 'analysisExport.py', 'videoUploads.py',
-         'armAngleModelResolutionSafe.joblib', 'labelTool.html', 'labelTool.js', 'workspace.css',
-         'LICENSE', 'MODEL_CARD.md', 'model-manifest.json', 'docs/AWS_LIGHTSAIL.md',
+         'model/armAngleModelResolutionSafe.joblib', 'labelTool.html', 'labelTool.js', 'workspace.css',
+         'LICENSE', 'docs/MODEL_CARD.md', 'model/model-manifest.json', 'docs/AWS_LIGHTSAIL.md',
          'tools/checkHostedCapacity.py', 'docs/HOSTED_TEST_REVIEW.md', 'docs/S3_SETUP.md', 'docs/PRIVACY_STORAGE.md']
 FILES += ['hosted/' + p for p in ['__init__.py','app.py','video.py','storage.py','example.py','manage.py','backups.py','deletions.py','account.js','templates/login.html','templates/account.html','templates/privacy.html']]
 FILES += ['deploy/' + p for p in ['gunicorn.conf.py','armangle.service','armangle-cleanup.service','armangle-cleanup.timer','Caddyfile','armangle.env.example']]

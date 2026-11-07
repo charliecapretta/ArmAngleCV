@@ -37,7 +37,7 @@ BODY_POINTS = ["shoulder", "off_shoulder", "elbow", "wrist"]
 
 def loadRows(limit=None):
     """Labeled pitches joined to their extracted release frame."""
-    labels = pd.read_csv(os.path.join(PROJECT_DIR, "labels.csv"))
+    labels = pd.read_csv(os.path.join(PROJECT_DIR, "data", "labels.csv"))
     labels = labels[labels["status"] == "labeled"].copy()
 
     frames = pd.read_csv(os.path.join(FRAMES_DIR, "frames.csv"))

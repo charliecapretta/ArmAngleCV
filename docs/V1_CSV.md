@@ -29,7 +29,7 @@ The server reads saved annotations and recomputes predictions with the frozen
 `manual-v1` model through `angleInputs.predict`. Browser preview values are never
 used as CSV inputs. Editing points changes the next saved export; confirming a
 different release clears its old saved points and prediction. The existing
-`predictLabels.py` CLI keeps its older column names and complete-row-only export;
+`scripts/predictLabels.py` CLI keeps its older column names and complete-row-only export;
 its predictions match the new session CSV for identical saved inputs.
 
 | Column | Meaning |

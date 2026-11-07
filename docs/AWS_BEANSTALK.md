@@ -193,7 +193,7 @@ placed, so the practice run ends in a comparison against a known answer. Uploads
 such reference and still show none.
 
 Serving a clip here publishes it to every visitor, which is not what the downloader in
-`fetchUiTestBatch.py` retrieves footage for. Confirm you may redistribute a clip before
+`scripts/fetchUiTestBatch.py` retrieves footage for. Confirm you may redistribute a clip before
 installing it, and remove it with `example remove --slug` if that changes.
 
 Check health and expiry:

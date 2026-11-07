@@ -77,7 +77,7 @@ def main():
     args = parser.parse_args()
 
     cache = detect.load()
-    labels = pd.read_csv(os.path.join(PROJECT_DIR, "labels.csv"))
+    labels = pd.read_csv(os.path.join(PROJECT_DIR, "data", "labels.csv"))
     labels = labels[labels["status"] == "labeled"]
 
     frames = pd.read_csv(os.path.join(PROJECT_DIR, "releaseFrames", "frames.csv"))

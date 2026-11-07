@@ -2,8 +2,8 @@
 Predict Statcast arm_angle from hand-labeled broadcast keypoints.
 
 Terminal stage of the pipeline:
-    fetchPitchBatch.py / fetchLowSlotBatch.py  ->  pitches/
-    labelServer.py + labelTool.html            ->  labels.csv
+    scripts/fetchPitchBatch.py, scripts/fetchLowSlotBatch.py  ->  pitches/
+    labelServer.py + labelTool.html            ->  data/labels.csv
     AnglePredictor.py                          ->  this
 
 Two things this reports, and the second is the point:
@@ -162,7 +162,7 @@ def report(data, predictions):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--labels", default="labels.csv")
+    parser.add_argument("--labels", default="data/labels.csv")
     parser.add_argument("--splits", type=int, default=8)
     parser.add_argument("--loo", action="store_true",
                         help="leave-one-pitcher-out: strictest, one fold per pitcher")

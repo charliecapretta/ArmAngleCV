@@ -11,6 +11,10 @@ import numpy as np
 import pandas as pd
 from joblib import dump
 from sklearn.model_selection import GroupKFold
+import os
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # repo root
+
 from AnglePredictor import make_model
 import features
 import angleInputs
@@ -24,9 +28,9 @@ def rescale(row, factor):
 
 
 def main():
-    root = Path(__file__).resolve().parent
+    root = Path(__file__).resolve().parents[1]
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--labels', default=str(root/'labels.csv'))
+    parser.add_argument('--labels', default=str(root/'data'/'labels.csv'))
     parser.add_argument('--out', default=str(root/'reports/resolution_validation'))
     parser.add_argument('--save', help='Save height720 model to a NEW path; never overwrite existing models')
     args = parser.parse_args()

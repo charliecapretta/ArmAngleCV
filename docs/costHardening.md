@@ -32,7 +32,7 @@ Commands (Python 3.12, hosted requirements, ffprobe and nginx installed):
 node --test tests/labelTool.test.cjs
 ```
 
-Raw measurements: [before](reports/costHardening/before.json), [after](reports/costHardening/after.json), [nginx bursts](reports/costHardening/nginxLimits.json).
+Raw measurements: [before](../reports/costHardening/before.json), [after](../reports/costHardening/after.json), [nginx bursts](../reports/costHardening/nginxLimits.json).
 
 ## Limits and rationale
 
@@ -58,7 +58,7 @@ Full frames retain original dimensions and use WebP q78, encoder method 1. Scrub
 
 **The sub-60 KB average is across the labeling workload, not full-resolution images alone.** Across all 1,920 generated full-resolution frames, the average was 122.68 KB; the five requested locked frames averaged 129.42 KB. Forcing these below 60 KB would require more compression or a resolution reduction. This implementation preserves joint detail and obtains the savings during browsing instead. It meets the session-average and total-transfer acceptance thresholds, but not a separate interpretation requiring full-resolution frames alone to average under 60 KB.
 
-The [3× comparison](reports/costHardening/precisionComparison.png) shows decoded source at left and final q78 at right. Visual inspection found comparable shoulder, elbow and wrist outlines; texture softens and the source's motion blur remains. This is a visual sample check, not a clinical/subpixel accuracy study. Preview resolution reduces browsing detail; precise placement waits for the full frame. The preview and full frame use the same source frame index and aspect ratio.
+The [3× comparison](../reports/costHardening/precisionComparison.png) shows decoded source at left and final q78 at right. Visual inspection found comparable shoulder, elbow and wrist outlines; texture softens and the source's motion blur remains. This is a visual sample check, not a clinical/subpixel accuracy study. Preview resolution reduces browsing detail; precise placement waits for the full frame. The preview and full frame use the same source frame index and aspect ratio.
 
 Legacy JPEG videos remain readable. Bundle installation upgrades shared templates while existing visitors retain their immutable JPEG hardlinks until expiry. Backup/restore validates both formats and includes scrub variants. No annotation schema, CSV schema or model artifact changed.
 

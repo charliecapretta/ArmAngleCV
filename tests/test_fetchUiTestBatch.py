@@ -7,7 +7,9 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-import fetchUiTestBatch as fetch
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
+import fetchUiTestBatch as fetch  # noqa: E402
 
 
 class RestoreExamplesTest(unittest.TestCase):
