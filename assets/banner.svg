@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 320" role="img" aria-label="ArmAngleCV: pitcher arm angle from broadcast video">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b1a2e"/>
+      <stop offset="1" stop-color="#13325a"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.78" cy="0.55" r="0.45">
+      <stop offset="0" stop-color="#4493f8" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#4493f8" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1280" height="320" rx="18" fill="url(#bg)"/>
+  <rect width="1280" height="320" rx="18" fill="url(#glow)"/>
+
+  <!-- protractor -->
+  <g transform="translate(980 205)" fill="none" stroke-linecap="round">
+    <g stroke="#8cb4e8" stroke-opacity="0.22" stroke-width="1.5">
+      <path d="M -190 0 A 190 190 0 0 1 190 0"/>
+      <path d="M -130 0 A 130 130 0 0 1 130 0"/>
+      <line x1="-230" y1="0" x2="230" y2="0" stroke-dasharray="4 8"/>
+    </g>
+    <g stroke="#8cb4e8" stroke-opacity="0.35" stroke-width="2">
+      <line x1="190" y1="0" x2="176" y2="0"/>
+      <line x1="164.5" y1="-95" x2="152.4" y2="-88"/>
+      <line x1="95" y1="-164.5" x2="88" y2="-152.4"/>
+      <line x1="0" y1="-190" x2="0" y2="-176"/>
+      <line x1="-95" y1="-164.5" x2="-88" y2="-152.4"/>
+      <line x1="-164.5" y1="-95" x2="-152.4" y2="-88"/>
+      <line x1="-190" y1="0" x2="-176" y2="0"/>
+    </g>
+    <!-- 38 degree arm slot -->
+    <path d="M 130 0 A 130 130 0 0 0 102.4 -80" stroke="#f2b134" stroke-width="5"/>
+    <line x1="0" y1="0" x2="74" y2="-58" stroke="#ffffff" stroke-width="7"/>
+    <line x1="74" y1="-58" x2="173" y2="-135" stroke="#ffffff" stroke-width="7"/>
+    <line x1="-62" y1="0" x2="0" y2="0" stroke="#ffffff" stroke-opacity="0.55" stroke-width="5"/>
+    <circle cx="-62" cy="0" r="9" fill="#9fc3f0"/>
+    <circle cx="0" cy="0" r="11" fill="#4493f8" stroke="#0b1a2e" stroke-width="3"/>
+    <circle cx="74" cy="-58" r="9" fill="#9fc3f0"/>
+    <circle cx="146" cy="-114" r="9" fill="#9fc3f0"/>
+    <circle cx="183" cy="-143" r="15" fill="#ffffff" stroke="#e5534b" stroke-width="3"/>
+    <path d="M 175 -153 q 6 10 0 21 M 191 -153 q -6 10 0 21" stroke="#e5534b" stroke-width="2"/>
+    <text x="148" y="-30" fill="#f2b134" stroke="none" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="30" font-weight="700">38°</text>
+  </g>
+
+  <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
+    <text x="72" y="148" fill="#ffffff" font-size="76" font-weight="800" letter-spacing="-1.5">ArmAngle<tspan fill="#4493f8">CV</tspan></text>
+    <text x="76" y="200" fill="#c9d7ea" font-size="27">Pitcher release arm angle from MLB broadcast video</text>
+    <text x="76" y="250" fill="#8cb4e8" font-size="20" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">5 clicks  →  Statcast-style angle  ·  2.65° RMSE</text>
+  </g>
+</svg>

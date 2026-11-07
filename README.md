@@ -1,161 +1,170 @@
-# ArmAngleCV
+<p align="center">
+  <img src="assets/banner.svg" alt="ArmAngleCV — pitcher release arm angle from MLB broadcast video" width="100%">
+</p>
 
-[![Checks](https://github.com/charliecapretta/ArmAngleCV/actions/workflows/checks.yml/badge.svg)](https://github.com/charliecapretta/ArmAngleCV/actions/workflows/checks.yml)
+<p align="center">
+  <a href="https://github.com/charliecapretta/ArmAngleCV/actions/workflows/checks.yml"><img src="https://img.shields.io/github/actions/workflow/status/charliecapretta/ArmAngleCV/checks.yml?branch=main&style=for-the-badge&label=checks" alt="Checks"></a>
+  <img src="https://img.shields.io/badge/python-3.12-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.12">
+  <a href="MODEL_CARD.md"><img src="https://img.shields.io/badge/model-manual--v1-0969da?style=for-the-badge" alt="Model manual-v1"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-2ea043?style=for-the-badge" alt="MIT license"></a>
+</p>
 
-A local tool for estimating a pitcher's release arm angle from manually marked
-video frames. Choose the release frame, click five points, then review, save,
-and export the result.
+<p align="center">
+  <a href="#how-it-works">How it works</a> ·
+  <a href="#quickstart">Quickstart</a> ·
+  <a href="#results">Results</a> ·
+  <a href="#data">Data</a> ·
+  <a href="MODEL_CARD.md">Model card</a> ·
+  <a href="#license--citation">Citation</a>
+</p>
 
-**Validated scope: MLB center-field broadcast footage.** The shipped model's
-pitcher-grouped development validation is **2.653° RMSE / 2.137° MAE** on 180
-pitches, versus **3.227° / 2.592°** for the raw shoulder-to-ball angle. College,
-high-school, and other camera views remain unverified. See the
-[model card](MODEL_CARD.md) for the exact dataset and limitations.
+ArmAngleCV estimates a pitcher's **release arm angle** from a single video frame.
+Pick the release frame, click five points, and get a Statcast-style angle in degrees —
+about **2.65° RMSE** against Statcast on pitchers the model never saw.
+
+> [!IMPORTANT]
+> **Validated scope: MLB center-field broadcast footage.** College, high-school,
+> side-view, and recruiting-reel accuracy is unverified. See the [model card](MODEL_CARD.md).
+
+## How it works
+
+<p align="center">
+  <img src="assets/five-points.svg" alt="Five points clicked at release: throwing shoulder, opposite shoulder, elbow, wrist, ball" width="85%">
+</p>
+
+1. **Find release.** Scrub the clip with the timeline, arrow keys, and neighboring
+   frames, then lock the release frame.
+2. **Mark five points.** The view zooms to the pitcher automatically. Click throwing
+   shoulder, opposite shoulder, elbow, wrist, then ball.
+3. **Estimate.** The app shows the raw shoulder-to-ball angle and the model estimate.
+   The model is a standardized ridge regression on 12 features from all five points,
+   with coordinates rescaled to 720 px height so resizing the video doesn't change the result.
+4. **Save and export.** Each saved pitch becomes a CSV row; export a whole session at once.
+
+| Step | Where | Writes |
+|---|---|---|
+| Fetch MLB examples *(optional)* | `fetchUiTestBatch.py` | `pitches/` |
+| Label and analyze | `labelServer.py` + `index.html` | `analysisLabels.csv` |
+| Predict | `angleInputs.py` + `armAngleModelResolutionSafe.joblib` | in-app estimate |
+| Export | **Export session CSV** / `predictLabels.py` | session CSV |
+| Retrain and evaluate | `evaluateAngleInputs.py` | `reports/` |
+| Verify release | `tools/checkRelease.py` | — |
 
 ## Quickstart
 
-Use **Python 3.12**. Run these commands from this project's folder:
+Use **Python 3.12**. No GPU or neural-network weights are needed.
 
 ```bash
 python3.12 -m venv .venv
-source .venv/bin/activate
+source .venv/bin/activate          # Windows: .venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
+python labelServer.py
 ```
 
-On Windows, activate with `.venv\Scripts\Activate.ps1` instead. Release preparation
-is checked on macOS; the included GitHub workflow runs the same core checks on
-Linux. No GPU, neural-network weights, or optional pose packages are needed.
+Open **http://127.0.0.1:8777/index.html** and choose **Upload a video** or **Try MLB examples**.
 
-You can use your own short clip immediately. To fetch one fixed MLB example first:
+To download one fixed MLB example clip first (omit `--limit 1` for all 12):
 
 ```bash
 python -m pip install -r requirements-fetch.txt
 python fetchUiTestBatch.py --limit 1
 ```
 
-Omit `--limit 1` to restore all 12 examples. Existing clips and labels are preserved.
-Downloads depend on the source's availability; your own video works offline.
+<details>
+<summary><b>Upload limits and labeling controls</b></summary>
 
-Start the app:
+- MP4 up to 100 MB, 60 s, 1920 × 1080, 60 fps, and 3,600 frames. Uploads are copied
+  to `uploads/` on your computer; nothing leaves your machine.
+- Drag a point to adjust it. Scroll to zoom at the cursor, shift-drag to pan, and
+  press `Z` to toggle between the pitcher crop and the full frame.
+- If the ball is hidden, mark it unavailable. It saves as an occluded annotation
+  but produces no model estimate.
+- Quality notes record uncertainty; they are not a confidence score.
+- Use short clips: frames are decoded into memory.
 
-```bash
-python labelServer.py
-```
+</details>
 
-Open [Pitch analysis](http://127.0.0.1:8777/index.html) and choose **Upload a video**
-or **Try MLB examples**. Use the file picker for an MP4 up to 100 MB, 60 seconds,
-1920 × 1080, 60 fps, and 3,600 frames. Optionally name the session and pitcher.
-The local app saves an uploaded copy on your computer; no cloud deployment is active.
+## Results
 
-1. **Release:** use the timeline, arrow keys, and neighboring frames. Select
-   **Use this frame** to save a release checkpoint.
-2. **Points:** the view zooms to where the pitcher stands as soon as the
-   release frame is locked. Click throwing shoulder, opposite shoulder, elbow,
-   wrist, then ball. Drag a point to adjust it. Scroll to zoom at the cursor,
-   shift-drag to pan, and press `Z` for the full frame and back. If the ball is
-   hidden, mark it unavailable.
-3. **Review:** see the measured image angle and model estimate. Select **Save
-   analysis**, then add another pitch or **Export session CSV**.
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/validation-dark.png">
+    <img src="assets/validation-light.png" alt="Held-out predictions vs Statcast arm angle, and error compared with the raw angle" width="100%">
+  </picture>
+</p>
 
-A saved five-point analysis produces a row in `analysisLabels.csv` and an angle
-in degrees. A hidden ball can be saved as an occluded annotation but does not
-produce a model estimate. Quality notes record uncertainty; they are not a
-confidence score. Use short clips or reels: frames are decoded into memory.
+Eight outer folds grouped by pitcher, so no pitcher appears in both training and test:
 
-## Your data
+| Method | RMSE | MAE |
+|---|---:|---:|
+| Raw shoulder-to-ball angle (no model) | 3.227° | 2.592° |
+| **ArmAngleCV `manual-v1`** | **2.653°** | **2.137°** |
 
-| File | Purpose |
+These are development cross-validation results on 180 pitches from 98 pitchers
+across all 30 parks, not an external benchmark. `tools/checkRelease.py` reproduces
+them exactly and verifies the shipped model's checksums.
+
+**Limits:** the extreme low-slot tail (below −30°) has 12 pitches from one pitcher,
+and there is no calibrated per-pitch confidence interval.
+Details are in the [model card](MODEL_CARD.md).
+
+## Data
+
+| File | Contents |
 |---|---|
-| `analysisLabels.csv` | Your saved analyses; excluded from the public release |
-| `localVideos.json` | Video registrations and named session metadata |
-| `uploads/` | Copies of videos selected with the file picker |
-| `localLabels.csv` | Older personal annotations; analysis reads them without rewriting them |
-| `labels.csv` | Current MLB development labels; training workspace writes here |
-| `data/manual-v1/labels.csv` | Frozen source snapshot for the shipped model; do not edit |
+| `data/manual-v1/labels.csv` | Frozen 184-row snapshot the shipped model was trained on. Do not edit. |
+| `labels.csv` | Current development labels (192 complete, 103 pitchers). |
+| `savant_data.csv` | Baseball Savant export, Aug 10–16, 2026, used to select pitches. |
+| `uiTestBatch.json` | Identifiers for the 12 MLB example clips. |
+| `analysisLabels.csv` | *Yours, created locally.* Saved analyses; git-ignored. |
 
-**Training labeler** is for dataset construction and reveals Statcast after point
-placement. **Pitch analysis** stores edits separately, including practice edits
-on MLB examples. Undo restores the previous saved row during the current session.
-Keep registered source videos in place so saved annotations can reopen them.
+Arm-angle targets and pitch metadata come from [Baseball Savant](https://baseballsavant.mlb.com/).
+No broadcast video is included. See [DATA_SOURCES.md](DATA_SOURCES.md) for attribution
+and the [V1 CSV contract](docs/V1_CSV.md) for export fields.
+This project is not affiliated with or endorsed by MLB.
 
-The session list reopens saved work after a reload. **Export session CSV** includes
-one row per saved pitch; unfinished pitches have a status and blank prediction.
-Exports use saved points and are disabled while the session has unsaved edits.
-See [the V1 CSV contract](docs/V1_CSV.md) for fields, conventions, and limitations.
-
-For the older command-line CSV export of complete saved estimates:
+## Development
 
 ```bash
-python predictLabels.py --labels analysisLabels.csv --out predictions.csv
+python -m unittest discover -s tests -v      # includes a real first-run server test
+node --test tests/labelTool.test.cjs          # browser workflow logic (Node 22)
+python tools/checkRelease.py                  # model/data checksums and grouped score
 ```
 
-## Development and verification
+| Status | Features |
+|---|---|
+| ✅ Supported | Manual release selection, five-point labeling, angle prediction, CSV export |
+| 🧪 Experimental | Automatic keypoints (`phase4/`) and release detection |
+| 🗓️ Planned | Independent validation batch; college footage validation |
 
-With the manual environment active, and Node.js 22 installed for the JavaScript tests:
+See [research workflows](docs/RESEARCH.md) and the [research history](docs/RESEARCH_HISTORY.md).
 
-```bash
-python -m unittest discover -s tests -v
-node --test tests/labelTool.test.cjs
-python tools/checkRelease.py
+<details>
+<summary><b>Hosted deployment (AWS)</b></summary>
+
+A separate Flask/Gunicorn runtime in `hosted/` serves the analysis workspace with
+per-visitor isolation, SQLite saves, private frame storage, upload limits, and
+expiry/deletion. The local app is unaffected.
+
+- [Elastic Beanstalk guide](docs/AWS_BEANSTALK.md) · build with `tools/prepareBeanstalk.py`
+- [Lightsail guide](docs/AWS_LIGHTSAIL.md)
+- [Optional S3 original storage](docs/S3_SETUP.md)
+- [Privacy and storage](docs/PRIVACY_STORAGE.md)
+- [Public release checklist](docs/PUBLIC_RELEASE.md)
+
+</details>
+
+## License & citation
+
+Code is released under the [MIT license](LICENSE). Statcast data remains subject to
+MLB's terms. If you use ArmAngleCV in your work, cite it with GitHub's
+**Cite this repository** button or:
+
+```bibtex
+@software{capretta_armanglecv_2026,
+  author = {Capretta, Charlie},
+  title  = {ArmAngleCV: Pitcher release arm angle from broadcast video},
+  year   = {2026},
+  url    = {https://github.com/charliecapretta/ArmAngleCV}
+}
 ```
-
-Tests use temporary files. The first-run test starts a real local server, opens
-an MP4, saves release and point annotations, predicts, exports, and checks undo
-while blocking optional download and pose packages. The release check verifies
-model/data checksums, refit identity, pitcher-grouped accuracy, and resizing.
-
-The public file set is built separately from personal workspace files and Git
-history:
-
-```bash
-python tools/prepareRelease.py --out release/public
-```
-
-Use a new output folder for each build. See [release preparation](docs/RELEASE.md)
-for the public-file list and publication boundary.
-
-## Project status
-
-- Supported: manual release selection, five-point labeling, normalized angle
-  prediction, separate analysis storage, and exports.
-- Experimental: automatic keypoints and release detection.
-- Deferred: a new independent validation batch and validation on college footage.
-
-The root dataset now has 192 complete labels from 103 pitchers. The shipped
-`manual-v1` model remains trained on its frozen 180-label snapshot. These are
-explicitly separate versions; [MODEL_CARD.md](MODEL_CARD.md) explains the results.
-
-[Research workflows](docs/RESEARCH.md) · [Data attribution](DATA_SOURCES.md) ·
-[MIT license](LICENSE)
-
-## Private hosted beta
-
-For public launch gates, emergency upload pause, privacy configuration, and
-off-instance backup setup, use [the current public release checklist](docs/PUBLIC_RELEASE.md).
-
-A separate Flask/Gunicorn runtime hosts the analysis workspace for a small beta.
-It adds per-visitor isolation, SQLite saves, private disk-backed video frames,
-upload/storage limits, expiry and deletion. The local quickstart above is unchanged.
-See [the AWS setup guide](docs/AWS_LIGHTSAIL.md) and [S3 upload assessment](docs/S3_UPLOAD_ASSESSMENT.md).
-
-A beta instance is deployed on Elastic Beanstalk behind CloudFront, running in
-anonymous mode: no sign-in, and saved work belongs to the browser that made it
-rather than to an account. Anyone holding the address can use it, so the
-unpublished link is the only access control. The account-based mode remains
-available for an invite-only deployment instead; neither mode offers public
-registration.
-
-For **Elastic Beanstalk with Python 3.12**, use the separate
-[Beanstalk setup guide](docs/AWS_BEANSTALK.md) and package generated by
-`tools/prepareBeanstalk.py`. The Lightsail ZIP is not a Beanstalk source bundle.
-
-Hosted uploads support 1080p/60fps MP4 clips up to 200 MB and 60 seconds.
-The five-example Beanstalk bundle opens all five practice pitches in each visitor's
-workspace, with individual pitch buttons and saved progress on return.
-[Optional private S3 original storage](docs/S3_SETUP.md) uses the EC2 instance role;
-frames and SQLite annotations remain on the instance. Direct browser-to-S3 uploads
-are not implemented.
-
-Hosted privacy/storage defaults now discard original uploads after processing, prevent
-new frame caching, and quarantine restored snapshots until deletion records are
-reconciled. See [privacy/storage deployment and recovery](docs/PRIVACY_STORAGE.md).
