@@ -64,8 +64,8 @@ Treat an estimate on non-broadcast footage as a rough reading, not a measurement
 ## Workflow
 
 ```bash
-./.venv/bin/python fetchPitchBatch.py --nPitches 250   # clips + Statcast truth
-./.venv/bin/python fetchLowSlotBatch.py                # top up the sidearm end
+./.venv/bin/python scripts/fetchPitchBatch.py --nPitches 250   # clips + Statcast truth
+./.venv/bin/python scripts/fetchLowSlotBatch.py                # top up the sidearm end
 ./.venv/bin/python labelServer.py                      # label — open the URL it prints
 ./.venv/bin/python AnglePredictor.py                   # label QA + held-out accuracy
 ```
@@ -81,7 +81,7 @@ model, held out by pitcher             RMSE  2.665   MAE  2.158
 
 Reproduce with `./.venv/bin/python AnglePredictor.py`.
 
-### 1. `fetchPitchBatch.py` — pitches + ground truth
+### 1. `scripts/fetchPitchBatch.py` — pitches + ground truth
 
 Reads the local `savant_data.csv` (25,000 pitches, 2026-08-10→16, 412
 pitchers, 93 games, 22 parks). No remote Statcast pull needed.
@@ -147,7 +147,7 @@ local labels or MLB training labels. Registrations remain in `localVideos.json`.
 Saved analysis coordinates are used to recalculate the estimate when reviewed.
 Legacy clients without a workspace parameter retain their original storage routes.
 
-`fetchUiTestBatch.py` adds the 12 verified MLB clips listed in `uiTestBatch.json`,
+`scripts/fetchUiTestBatch.py` adds the 12 verified MLB clips listed in `uiTestBatch.json`,
 without replacing existing clips or labels. There are now 196 MLB clips available.
 The new batch has not been used to retrain the model.
 
@@ -195,8 +195,8 @@ this workflow is intended for pitch clips and short reels.
 To export releases even before point labeling is finished:
 
 ```bash
-./.venv/bin/python extractReleaseFrames.py
-./.venv/bin/python extractReleaseFrames.py --labels localLabels.csv --outDir localReleaseFrames
+./.venv/bin/python scripts/extractReleaseFrames.py
+./.venv/bin/python scripts/extractReleaseFrames.py --labels localLabels.csv --outDir localReleaseFrames
 ```
 
 
@@ -209,8 +209,8 @@ detection or save labels. The model scales coordinates uniformly to a common
 now leaves predictions unchanged. Crop/zoom/view changes are not corrected by this.
 
 ```bash
-./.venv/bin/python predictLabels.py --labels localLabels.csv
-./.venv/bin/python evaluateAngleInputs.py
+./.venv/bin/python scripts/predictLabels.py --labels localLabels.csv
+./.venv/bin/python scripts/evaluateAngleInputs.py
 # Optional refit: add --save with a new model filename (existing files are preserved).
 ```
 
@@ -226,7 +226,7 @@ without claiming an exact release. Existing rows default to unreviewed. The new
 `release_quality` and `point_quality` fields append after the first 30 CSV columns.
 Quality flags are review metadata, not calibrated confidence or automatic exclusions.
 
-### 3. `fetchLowSlotBatch.py` — closing the sidearm gap
+### 3. `scripts/fetchLowSlotBatch.py` — closing the sidearm gap
 
 Targeted pull for low arm slots, which the one-week export barely contained.
 Reads the season arm-angle leaderboard, keeps pitchers at or below
@@ -234,8 +234,8 @@ Reads the season arm-angle leaderboard, keeps pitchers at or below
 across as many distinct parks and games as possible.
 
 ```bash
-./.venv/bin/python fetchLowSlotBatch.py --dryRun
-./.venv/bin/python fetchLowSlotBatch.py
+./.venv/bin/python scripts/fetchLowSlotBatch.py --dryRun
+./.venv/bin/python scripts/fetchLowSlotBatch.py
 ```
 
 **The binding constraint is that these pitchers barely exist.** On the 2026

@@ -187,9 +187,9 @@ def create_app(config=None):
                            parsed_origin.path or parsed_origin.query or parsed_origin.fragment or
                            parsed_origin.username or parsed_origin.password):
         raise RuntimeError('ARMANGLE_ORIGIN must be the public https:// address.')
-    manifest = json.loads((ROOT / 'model-manifest.json').read_text())
+    manifest = json.loads((ROOT / 'model' / 'model-manifest.json').read_text())
     model_path = ROOT / angleInputs.DEFAULT_MODEL
-    if hashlib.sha256(model_path.read_bytes()).hexdigest() != manifest['sha256'][model_path.name]:
+    if hashlib.sha256(model_path.read_bytes()).hexdigest() != manifest['sha256'][angleInputs.DEFAULT_MODEL]:
         raise RuntimeError('The hosted model checksum does not match the release manifest.')
     bundle = labelServer.getManualAngleBundle()
     if bundle.get('features') != angleInputs.columns(bundle.get('feature_mode')):

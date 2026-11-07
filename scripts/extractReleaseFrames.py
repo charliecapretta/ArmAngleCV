@@ -8,8 +8,8 @@ Why bother: the 184 clips take ~887 MB. One frame each is ~42 MB, a 20x saving.
 And an image set is what CVAT actually wants: 180 images is one task, whereas
 184 videos would be 184 tasks.
 
-    python extractReleaseFrames.py                # release frame only
-    python extractReleaseFrames.py --window 2     # release frame +/- 2, for margin
+    python scripts/extractReleaseFrames.py                # release frame only
+    python scripts/extractReleaseFrames.py --window 2     # release frame +/- 2, for margin
 
 Produces:
     releaseFrames/<game_pk>_<play_id>_f<frame>.jpg
@@ -23,6 +23,8 @@ import os
 import sys
 
 import cv2
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # repo root
 
 import savantUtils
 from labelServer import clipPathFor
@@ -62,7 +64,7 @@ def grabFrames(clipPath, wanted):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--labels", default="labels.csv")
+    parser.add_argument("--labels", default=os.path.join(savantUtils.PROJECT_DIR, "data", "labels.csv"))
     parser.add_argument("--window", type=int, default=0,
                         help="also keep N frames either side of release")
     parser.add_argument("--quality", type=int, default=92)

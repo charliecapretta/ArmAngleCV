@@ -165,7 +165,7 @@ def main():
     # unchanged to predicted ones shows whether refitting is actually helping or whether
     # it is chasing noise in the predicted features.
     handFit = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                           "armAngleModel.joblib")
+                           "model", "armAngleModel.joblib")
     if os.path.exists(handFit):
         from joblib import load
         saved = load(handFit)

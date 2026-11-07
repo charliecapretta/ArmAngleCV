@@ -9,9 +9,9 @@ the release frame: that is still chosen by hand (`--frame`), and automating it i
 separate piece of work. Without `--frame` it falls back to the frame recorded in
 labels.csv, which makes this runnable on any already-labeled pitch.
 
-    ./.venv/bin/python predictAngle.py --play-id 021a4434-6043-3435-9718-c6b92b0bf8fc
-    ./.venv/bin/python predictAngle.py --play-id <id> --frame 181
-    ./.venv/bin/python predictAngle.py --image someFrame.jpg --p-throws R
+    ./.venv/bin/python scripts/predictAngle.py --play-id 021a4434-6043-3435-9718-c6b92b0bf8fc
+    ./.venv/bin/python scripts/predictAngle.py --play-id <id> --frame 181
+    ./.venv/bin/python scripts/predictAngle.py --image someFrame.jpg --p-throws R
 
 Every coordinate goes through features.py, the same module labelServer.py uses to
 derive the angles it stores, so a predicted row and a hand-clicked row cannot be
@@ -26,12 +26,14 @@ import sys
 import cv2
 import numpy as np
 
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # repo root
+
 import features
 import angleInputs
 import savantUtils
 from phase4 import buildDataset, dataset, detect
 
-PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MODEL_PATH = os.path.join(PROJECT_DIR, "phase4", "keypoints.pt")
 RIDGE_PATH = os.path.join(PROJECT_DIR, "phase4", "armAngleFromPredicted.joblib")
 CROP_SIDE = 1.6      # multiples of person-box height; see buildDataset.py
@@ -55,7 +57,7 @@ def loadKeypointModel(path):
 
 def labelRow(playId):
     """The labels.csv row for this pitch, if it has one -- for --frame and p_throws."""
-    path = os.path.join(PROJECT_DIR, "labels.csv")
+    path = os.path.join(PROJECT_DIR, "data", "labels.csv")
     if not os.path.exists(path):
         return None
     with open(path, newline="") as handle:

@@ -8,17 +8,17 @@ Automatic release detection and keypoint labeling remain experimental.
 - `manual-v1`: the unchanged shipped normalized Ridge model, trained on 180
   complete labels from 98 pitchers. Its exact source file is
   `data/manual-v1/labels.csv` (184 rows including four skipped pitches).
-- `development-2026-09-09`: root `labels.csv`, containing 192 complete labels
+- `development-2026-09-09`: `data/labels.csv`, containing 192 complete labels
   from 103 pitchers, plus four skipped pitches. The 12 additional labels are
   not in the shipped normalized model's training snapshot.
-- See [MODEL_CARD.md](../MODEL_CARD.md) for evaluation boundaries and checksums.
+- See [MODEL_CARD.md](MODEL_CARD.md) for evaluation boundaries and checksums.
 
 ## Reproduce the shipped model's development validation
 
 Run from the project root with the README environment activated:
 
 ```bash
-python evaluateAngleInputs.py --labels data/manual-v1/labels.csv --out reports/reproduced-manual-v1
+python scripts/evaluateAngleInputs.py --labels data/manual-v1/labels.csv --out reports/reproduced-manual-v1
 ```
 
 This evaluates input conventions with eight folds grouped by pitcher. The
@@ -30,7 +30,7 @@ The current development dataset can be evaluated separately:
 
 ```bash
 python AnglePredictor.py
-python evaluateAngleInputs.py --out reports/reproduced-development
+python scripts/evaluateAngleInputs.py --out reports/reproduced-development
 ```
 
 The current original-input RMSE is approximately 2.665 degrees and normalized
@@ -39,10 +39,10 @@ models, not new independent measurements of the shipped artifact.
 
 ## Downloading training material
 
-Install `requirements-fetch.txt` first. `fetchPitchBatch.py` samples the included
-Statcast export, while `fetchLowSlotBatch.py` queries additional low-slot pitchers.
+Install `requirements-fetch.txt` first. `scripts/fetchPitchBatch.py` samples the included
+Statcast export, while `scripts/fetchLowSlotBatch.py` queries additional low-slot pitchers.
 Network availability and upstream footage retention can affect these scripts.
-`fetchUiTestBatch.py` restores the fixed public example manifest; it does not
+`scripts/fetchUiTestBatch.py` restores the fixed public example manifest; it does not
 select new examples or change the training labels.
 
 ## Optional pose and keypoint experiments

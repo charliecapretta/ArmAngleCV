@@ -45,7 +45,7 @@ import analysisExport
 import videoUploads
 from features import deriveAngles
 
-LABELS_PATH = os.path.join(savantUtils.PROJECT_DIR, "labels.csv")
+LABELS_PATH = os.path.join(savantUtils.PROJECT_DIR, "data", "labels.csv")
 LOCAL_LABELS_PATH = os.path.join(savantUtils.PROJECT_DIR, "localLabels.csv")
 LOCAL_VIDEOS_PATH = os.path.join(savantUtils.PROJECT_DIR, "localVideos.json")
 ANALYSIS_LABELS_PATH = os.path.join(savantUtils.PROJECT_DIR, "analysisLabels.csv")
@@ -858,7 +858,7 @@ def main():
     print(f"Serving {savantUtils.PROJECT_DIR}")
     print(f"{len(pitches)} pitches with clips (frames decoded on demand)")
     if not pitches:
-        print("  (none yet -- open a local video in the labeler, or run fetchPitchBatch.py)")
+        print("  (none yet -- open a local video in the labeler, or run scripts/fetchPitchBatch.py)")
     print(f"Labels -> {LABELS_PATH}")
     print(f"\n  open http://127.0.0.1:{httpd.server_port}/index.html\n", flush=True)
 

@@ -24,7 +24,7 @@ about **2.65° RMSE** against Statcast on pitchers the model never saw.
 
 > [!IMPORTANT]
 > **Validated scope: MLB center-field broadcast footage.** College, high-school,
-> side-view, and recruiting-reel accuracy is unverified. See the [model card](MODEL_CARD.md).
+> side-view, and recruiting-reel accuracy is unverified. See the [model card](docs/MODEL_CARD.md).
 
 ## How it works
 
@@ -43,11 +43,11 @@ about **2.65° RMSE** against Statcast on pitchers the model never saw.
 
 | Step | Where | Writes |
 |---|---|---|
-| Fetch MLB examples *(optional)* | `fetchUiTestBatch.py` | `pitches/` |
+| Fetch MLB examples *(optional)* | `scripts/fetchUiTestBatch.py` | `pitches/` |
 | Label and analyze | `labelServer.py` + `index.html` | `analysisLabels.csv` |
-| Predict | `angleInputs.py` + `armAngleModelResolutionSafe.joblib` | in-app estimate |
-| Export | **Export session CSV** / `predictLabels.py` | session CSV |
-| Retrain and evaluate | `evaluateAngleInputs.py` | `reports/` |
+| Predict | `angleInputs.py` + `model/armAngleModelResolutionSafe.joblib` | in-app estimate |
+| Export | **Export session CSV** / `scripts/predictLabels.py` | session CSV |
+| Retrain and evaluate | `scripts/evaluateAngleInputs.py` | `reports/` |
 | Verify release | `tools/checkRelease.py` | — |
 
 ## Quickstart
@@ -67,7 +67,7 @@ To download one fixed MLB example clip first (omit `--limit 1` for all 12):
 
 ```bash
 python -m pip install -r requirements-fetch.txt
-python fetchUiTestBatch.py --limit 1
+python scripts/fetchUiTestBatch.py --limit 1
 ```
 
 <details>
@@ -106,22 +106,40 @@ them exactly and verifies the shipped model's checksums.
 
 **Limits:** the extreme low-slot tail (below −30°) has 12 pitches from one pitcher,
 and there is no calibrated per-pitch confidence interval.
-Details are in the [model card](MODEL_CARD.md).
+Details are in the [model card](docs/MODEL_CARD.md).
 
 ## Data
 
 | File | Contents |
 |---|---|
 | `data/manual-v1/labels.csv` | Frozen 184-row snapshot the shipped model was trained on. Do not edit. |
-| `labels.csv` | Current development labels (192 complete, 103 pitchers). |
-| `savant_data.csv` | Baseball Savant export, Aug 10–16, 2026, used to select pitches. |
+| `data/labels.csv` | Current development labels (192 complete, 103 pitchers). |
+| `data/savant_data.csv` | Baseball Savant export, Aug 10–16, 2026, used to select pitches. |
 | `uiTestBatch.json` | Identifiers for the 12 MLB example clips. |
 | `analysisLabels.csv` | *Yours, created locally.* Saved analyses; git-ignored. |
 
 Arm-angle targets and pitch metadata come from [Baseball Savant](https://baseballsavant.mlb.com/).
-No broadcast video is included. See [DATA_SOURCES.md](DATA_SOURCES.md) for attribution
+No broadcast video is included. See [DATA_SOURCES.md](docs/DATA_SOURCES.md) for attribution
 and the [V1 CSV contract](docs/V1_CSV.md) for export fields.
 This project is not affiliated with or endorsed by MLB.
+
+## Project layout
+
+```
+ArmAngleCV/
+├── labelServer.py        # local app server — start here
+├── index.html, labelTool.*, workspace.css   # browser UI
+├── angleInputs.py, features.py, AnglePredictor.py   # model inputs and estimator
+├── analysisExport.py, videoUploads.py, savantUtils.py, releaseTiming.py
+├── scripts/              # command-line tools: fetch clips, predict, evaluate
+├── model/                # shipped ridge models + checksummed manifest
+├── data/                 # labels, frozen manual-v1 snapshot, Statcast export
+├── hosted/  deploy/      # optional AWS web app and its deployment config
+├── phase4/               # experimental automatic keypoints
+├── tools/  tests/        # release checks, bundle builders, test suite
+├── docs/                 # model card, data sources, guides
+└── assets/  reports/     # README images, validation outputs
+```
 
 ## Development
 

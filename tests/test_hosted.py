@@ -164,7 +164,7 @@ class HostedTest(unittest.TestCase):
     def test_auth_csrf_allowlist_and_login_limit(self):
         guest=self.app.test_client()
         self.assertEqual(guest.get('/api/pitches').status_code,401)
-        for path in ('/labelServer.py','/labels.csv','/.git/config','/uploads/test.mp4','/labelTool.html','/api/pose','/api/ball','/api/prefetch'):
+        for path in ('/labelServer.py','/data/labels.csv','/.git/config','/uploads/test.mp4','/labelTool.html','/api/pose','/api/ball','/api/prefetch'):
             self.assertEqual(self.alice.get(path).status_code,404,path)
         self.assertEqual(self.alice.post('/api/import',json={}).status_code,403)
         self.assertEqual(self.post(self.alice,self.a,'/api/import',dict(path='/etc/passwd')).status_code,400)
